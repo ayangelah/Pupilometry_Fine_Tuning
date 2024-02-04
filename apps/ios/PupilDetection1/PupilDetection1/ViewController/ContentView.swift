@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UIKit
 import AVFoundation // Import AVFoundation for flashlight/torch control
 import Photos // Import Photos framework for saving videos
 import Vision
@@ -15,47 +14,51 @@ struct ContentView: View {
     @State private var isShowingCamera = false
     
     var body: some View {
-        VStack {
-            Text("👁️") // Eye emoji
-                .font(.system(size: 100)) // Set font size to extra large
-                .foregroundStyle(.tint)
-            Text("Pupil Detection Attempt")
-            Button(action: {
-                // Button action added here
-                isShowingCamera.toggle()
-                print("Button tapped!")
-            }) {
-                Text("Access Camera")
+        NavigationView {
+            VStack {
+                Spacer()
+                Text("👁️ Pupilometry")
+                    .font(.title)
                     .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
+                Text("Measure pupil dilation and constriction")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Button(action: {
+                    // Toggle camera view
+                    isShowingCamera.toggle()
+                }) {
+                    Label("Start Measurement", systemImage: "camera.viewfinder")
+                        .font(.headline)
+                        .padding()
+                        .foregroundColor(.white)
+                        .background(Color.blue)
+                        .cornerRadius(10)
+                }
+                .padding(.bottom)
             }
-        }
-        .padding()
-        .sheet(isPresented: $isShowingCamera) {
-            CameraView()
+            .padding()
+            .sheet(isPresented: $isShowingCamera) {
+                CameraView()
+            }
         }
     }
 }
 
 struct CameraView: UIViewControllerRepresentable {
     typealias UIViewControllerType = UIImagePickerController
-    
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
-        picker.cameraDevice = .rear // Set to front camera
-        picker.mediaTypes = ["public.movie"] // Specify video media type
-        picker.cameraCaptureMode = .video // Set capture mode to video
-        picker.delegate = context.coordinator // Set delegate
+        picker.cameraDevice = .rear
+        picker.mediaTypes = ["public.movie"]
+        picker.cameraCaptureMode = .video
+        picker.delegate = context.coordinator
         return picker
-        
-        
     }
     
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {
-        // Update
+        // Intentionally left blank for future updates
     }
     
     func makeCoordinator() -> Coordinator {
@@ -63,15 +66,12 @@ struct CameraView: UIViewControllerRepresentable {
     }
     
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        var isFlashlightOn = false
-        
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
             guard let url = info[.mediaURL] as? URL else {
                 print("Error: Could not get video URL")
                 return
             }
             
-            // Saves the video to the photo library
             PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
             } completionHandler: { success, error in
@@ -90,6 +90,7 @@ struct CameraView: UIViewControllerRepresentable {
         }
     }
 }
+
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
