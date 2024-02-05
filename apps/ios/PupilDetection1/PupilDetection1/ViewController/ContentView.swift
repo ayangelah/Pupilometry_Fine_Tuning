@@ -9,6 +9,7 @@ import SwiftUI
 import AVFoundation // Import AVFoundation for flashlight/torch control
 import Photos // Import Photos framework for saving videos
 import Vision
+import CoreHaptics
 
 struct ContentView: View {
     @State private var isShowingCamera = false
@@ -64,6 +65,7 @@ class CustomCameraViewController: UIViewController {
     private var videoPreviewLayer: AVCaptureVideoPreviewLayer?
     private var cameraOutput: AVCaptureMovieFileOutput?
     private var torchIsOn = false
+    private var hapticEngine: CHHapticEngine?
     var dismissHandler: (() -> Void)?
     
     private let topBar: UIView = {
@@ -123,9 +125,19 @@ class CustomCameraViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupHapticEngine()
         setupCaptureSession()
         setupUIComponents()
         drawBoundingBox()
+    }
+    
+    private func setupHapticEngine() {
+        do {
+            hapticEngine = try CHHapticEngine()
+            try hapticEngine?.start()
+        } catch {
+            print("Failed to start haptic engine: \(error)")
+        }
     }
     
     private func setupUIComponents() {
@@ -187,6 +199,51 @@ class CustomCameraViewController: UIViewController {
     @objc private func dismissCameraView() {
         dismissHandler?()
     }
+    
+    private func hapticFeedbackStartRecording() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+        var events = [CHHapticEvent]()
+        
+        // Start recording pattern
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
+        let startEvent = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+        events.append(startEvent)
+        
+        do {
+            let pattern = try CHHapticPattern(events: events, parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play haptic feedback: \(error)")
+        }
+    }
+    
+    private func hapticFeedbackStopRecording() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+        var events = [CHHapticEvent]()
+        
+        // Parameters for both haptic taps
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
+        
+        // First haptic tap event
+        let firstTap = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+        events.append(firstTap)
+        
+        // Second haptic tap event, with a slight delay
+        let secondTap = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0.1) // Delay the second tap by 0.1 seconds
+        events.append(secondTap)
+        
+        do {
+            let pattern = try CHHapticPattern(events: events, parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play haptic feedback: \(error)")
+        }
+    }
+
     
     private func setupCaptureSession() {
         captureSession = AVCaptureSession()
@@ -267,11 +324,13 @@ class CustomCameraViewController: UIViewController {
     @objc private func toggleRecording() {
         if cameraOutput?.isRecording == true {
             cameraOutput?.stopRecording()
+            hapticFeedbackStopRecording()
             let symbolConfig = UIImage.SymbolConfiguration(pointSize: 50, weight: .regular, scale: .large)
             let stopImage = UIImage(systemName: "record.circle", withConfiguration: symbolConfig)
             recordButton.setImage(stopImage, for: .normal)
             recordButton.tintColor = .red
         } else {
+            hapticFeedbackStartRecording()
             let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
             let outputPath = "\(documentsPath)/output.mov"
             let outputFileURL = URL(fileURLWithPath: outputPath)
@@ -283,6 +342,11 @@ class CustomCameraViewController: UIViewController {
             recordButton.setImage(recordImage, for: .normal)
             recordButton.tintColor = .red
         }
+    }
+    
+    private func stopHapticEngine() {
+        hapticEngine?.stop(completionHandler: nil) // Stop the engine immediately
+        hapticEngine = nil // Optionally, set the engine to nil to release it for garbage collection
     }
     
     private var boundingBoxLayer: CAShapeLayer?
@@ -311,6 +375,12 @@ class CustomCameraViewController: UIViewController {
         
         // Keep a reference to remove it later
         boundingBoxLayer = shapeLayer
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        stopHapticEngine() // Ensure the haptic engine is stopped before the view disappears
+        captureSession?.stopRunning()
     }
 
 }
@@ -354,7 +424,7 @@ extension CustomCameraViewController: AVCaptureVideoDataOutputSampleBufferDelega
         // As an alternative, consider using other Vision requests or custom algorithms for iris detection.
         
         // Example of drawing a placeholder bounding box for illustration
-        let placeholderBoundingBox = CGRect(x: 0.25, y: 0.25, width: 0.25, height: 0.25) // Placeholder values
+        _ = CGRect(x: 0.25, y: 0.25, width: 0.25, height: 0.25) // Placeholder values
         DispatchQueue.main.async { [weak self] in
             self?.drawBoundingBox()
         }
