@@ -17,7 +17,7 @@ struct ContentView: View {
         NavigationView {
             VStack {
                 Spacer()
-                Text("👁️ Pupilometry")
+                Text("👁️ Pupillometer")
                     .font(.title)
                     .padding()
                 Text("Measure pupil dilation and constriction.")
