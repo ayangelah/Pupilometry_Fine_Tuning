@@ -265,7 +265,7 @@ extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
         }) { saved, error in
             if saved {
                 DispatchQueue.main.async {
-                    let alert = UIAlertController(title: "Saved", message: "Your video has been saved to Photos.", preferredStyle: .alert)
+                    let alert = UIAlertController(title: "Scan Complete", message: "Your video has been saved to Photos and is ready to use for pupil examination.", preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "OK", style: .default))
                     self.present(alert, animated: true)
                 }
