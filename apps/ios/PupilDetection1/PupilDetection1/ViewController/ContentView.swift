@@ -100,10 +100,32 @@ class CustomCameraViewController: UIViewController {
         return button
     }()
     
+    private let instructionLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.7) // Semi-transparent background
+        label.textColor = .white
+        label.text = "Center patient's pupil in red box."
+        label.textAlignment = .center
+        label.layer.cornerRadius = 10
+        label.clipsToBounds = true
+        return label
+    }()
+    
+    private let dismissButton: UIButton = {
+        let button = UIButton(type: .system)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium, scale: .medium)
+        button.setImage(UIImage(systemName: "xmark.circle.fill", withConfiguration: symbolConfig), for: .normal)
+        button.tintColor = .white
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupCaptureSession()
         setupUIComponents()
+        drawBoundingBox()
     }
     
     private func setupUIComponents() {
@@ -111,6 +133,17 @@ class CustomCameraViewController: UIViewController {
         setupTorchButton()
         setupRecordButton()
         setupDismissButton()
+        setupInstructionLabel()
+    }
+    
+    private func setupInstructionLabel() {
+        view.addSubview(instructionLabel)
+        NSLayoutConstraint.activate([
+            instructionLabel.centerYAnchor.constraint(equalTo: dismissButton.centerYAnchor),
+            instructionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            instructionLabel.widthAnchor.constraint(equalToConstant: 250), // Adjust width as needed
+            instructionLabel.heightAnchor.constraint(equalToConstant: 40) // Adjust height as needed
+        ])
     }
     
     private func setupBars() {
@@ -137,14 +170,10 @@ class CustomCameraViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         videoPreviewLayer?.frame = view.bounds
+        drawBoundingBox()
     }
     
     private func setupDismissButton() {
-        let dismissButton = UIButton(type: .system)
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium, scale: .medium)
-        dismissButton.setImage(UIImage(systemName: "xmark.circle.fill", withConfiguration: symbolConfig), for: .normal)
-        dismissButton.tintColor = .white
-        dismissButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(dismissButton)
         
         NSLayoutConstraint.activate([
@@ -255,6 +284,35 @@ class CustomCameraViewController: UIViewController {
             recordButton.tintColor = .red
         }
     }
+    
+    private var boundingBoxLayer: CAShapeLayer?
+    
+    private func drawBoundingBox() {
+        boundingBoxLayer?.removeFromSuperlayer()
+        
+        // Define the size of the bounding box
+        let boxWidth: CGFloat = 200 // Example width
+        let boxHeight: CGFloat = 200 // Example height
+        
+        // Calculate the starting point for the bounding box to be centered
+        let startX = (view.bounds.width - boxWidth) / 2
+        let startY = (view.bounds.height - boxHeight) / 2
+        
+        // Create the bounding box rectangle
+        let boundingBoxRect = CGRect(x: startX, y: startY, width: boxWidth, height: boxHeight)
+        
+        // Create and configure the shape layer for the bounding box
+        let shapeLayer = CAShapeLayer()
+        shapeLayer.frame = boundingBoxRect
+        shapeLayer.borderColor = UIColor.red.cgColor
+        shapeLayer.borderWidth = 2
+        shapeLayer.cornerRadius = 10 // Optional, for rounded corners
+        view.layer.addSublayer(shapeLayer)
+        
+        // Keep a reference to remove it later
+        boundingBoxLayer = shapeLayer
+    }
+
 }
 
 extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
@@ -273,6 +331,38 @@ extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
         }
     }
 }
+
+extension CustomCameraViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        
+        let request = VNDetectContoursRequest(completionHandler: handleContours)
+        request.contrastAdjustment = 2.0 // Increase contrast to make pupil detection more likely
+        request.detectsDarkOnLight = true
+        
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
+        try? handler.perform([request])
+    }
+    
+    private func handleContours(request: VNRequest, error: Error?) {
+        
+        // This approach assumes we find a way to determine a relevant contour for the iris.
+        // It's a placeholder to illustrate conversion of a contour to a bounding box.
+        // In practice, you would need more sophisticated logic to identify the iris among detected contours.
+        
+        // Directly drawing bounding box from contours is not straightforward with VNContoursObservation.
+        // As an alternative, consider using other Vision requests or custom algorithms for iris detection.
+        
+        // Example of drawing a placeholder bounding box for illustration
+        let placeholderBoundingBox = CGRect(x: 0.25, y: 0.25, width: 0.25, height: 0.25) // Placeholder values
+        DispatchQueue.main.async { [weak self] in
+            self?.drawBoundingBox()
+        }
+    }
+    
+    // Assuming drawBoundingBox is correctly implemented to draw on the UIView coordinate system.
+}
+
 
 
 struct ContentView_Previews: PreviewProvider {
