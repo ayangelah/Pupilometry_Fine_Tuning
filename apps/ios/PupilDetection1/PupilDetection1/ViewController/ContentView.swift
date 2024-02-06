@@ -19,7 +19,7 @@ struct ContentView: View {
         NavigationView {
             VStack {
                 VStack(alignment: .center, spacing: 0) {
-                    Text("👁️ Pupillometer")
+                    Text("👁️ Visualyze")
                         .font(.largeTitle)
                         .padding(.top)
 
@@ -521,18 +521,21 @@ struct RecordingDetailView: View {
     
     var body: some View {
         VStack {
-            Image(uiImage: recording.firstFrame) // Display the first frame
+            HStack {
+                Image(uiImage: recording.firstFrame) // Display the first frame
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding()
+                Image(uiImage: recording.lastFrame) // Display the last frame
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding()
+            }
+            /* Image(uiImage: recording.thumbnail)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .padding()
-            Image(uiImage: recording.lastFrame) // Display the last frame
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .padding()
-            Image(uiImage: recording.thumbnail)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .padding()
+             */
             Text("Initial Diameter: \(recording.initialDiameter) mm")
             Text("Final Diameter: \(recording.finalDiameter) mm")
             Text("Percent Change: \(recording.percentChange)%")
