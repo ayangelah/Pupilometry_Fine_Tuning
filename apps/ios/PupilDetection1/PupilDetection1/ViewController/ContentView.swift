@@ -6,27 +6,56 @@
 //
 
 import SwiftUI
-import AVFoundation // Import AVFoundation for flashlight/torch control
-import Photos // Import Photos framework for saving videos
+import Photos
 import Vision
 import CoreHaptics
 
 struct ContentView: View {
+    @State private var recordings: [Recording] = []
     @State private var isShowingCamera = false
-    
+
     var body: some View {
         NavigationView {
-            VStack {
-                Spacer()
+            VStack(spacing: 16) {
                 Text("👁️ Pupillometer")
-                    .font(.title)
-                    .padding()
+                    .font(.largeTitle)
+                    .padding(.top)
+
                 Text("Measure pupil dilation and constriction.")
-                    .font(.subheadline)
+                    .font(.headline)
                     .foregroundColor(.secondary)
+                
+                // Use ScrollView to ensure content is scrollable when exceeding screen bounds
+                ScrollView {
+                    VStack(alignment: .leading) {
+                        Text("Recordings")
+                            .font(.headline)
+                            .padding(.leading)
+                            .padding(.top)
+
+                        // This List shows the recordings
+                        ForEach(recordings) { recording in
+                            NavigationLink(destination: RecordingDetailView(recording: recording)) {
+                                HStack {
+                                    Image(uiImage: recording.thumbnail)
+                                        .resizable()
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(Circle())
+                                    VStack(alignment: .leading) {
+                                        Text("Initial: \(recording.initialDiameter) mm")
+                                        Text("Final: \(recording.finalDiameter) mm")
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+
                 Spacer()
+
                 Button(action: {
-                    // Toggle camera view
                     isShowingCamera.toggle()
                 }) {
                     Label("Start Measurement", systemImage: "camera.viewfinder")
@@ -38,11 +67,25 @@ struct ContentView: View {
                 }
                 .padding(.bottom)
             }
-            .padding()
             .fullScreenCover(isPresented: $isShowingCamera, content: CustomCameraView.init)
+            .navigationBarHidden(true) // Hide the navigation bar to use custom titles
+            .padding()
+        }
+        .onAppear {
+            populateSampleData()
         }
     }
+
+    func populateSampleData() {
+        let sampleThumbnail = UIImage(systemName: "eye") ?? UIImage()
+        recordings = [
+            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.0, finalDiameter: 3.0, percentChange: -40.0, averageConstrictionVelocity: 0.2),
+            Recording(thumbnail: sampleThumbnail, initialDiameter: 4.5, finalDiameter: 2.8, percentChange: -37.8, averageConstrictionVelocity: 0.25),
+            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.2, finalDiameter: 3.5, percentChange: -32.7, averageConstrictionVelocity: 0.22)
+        ]
+    }
 }
+
 
 struct CustomCameraView: UIViewControllerRepresentable {
     @Environment(\.presentationMode) var presentationMode
@@ -243,7 +286,7 @@ class CustomCameraViewController: UIViewController {
             print("Failed to play haptic feedback: \(error)")
         }
     }
-
+    
     
     private func setupCaptureSession() {
         captureSession = AVCaptureSession()
@@ -382,7 +425,7 @@ class CustomCameraViewController: UIViewController {
         stopHapticEngine() // Ensure the haptic engine is stopped before the view disappears
         captureSession?.stopRunning()
     }
-
+    
 }
 
 extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
@@ -433,6 +476,34 @@ extension CustomCameraViewController: AVCaptureVideoDataOutputSampleBufferDelega
     // Assuming drawBoundingBox is correctly implemented to draw on the UIView coordinate system.
 }
 
+struct RecordingDetailView: View {
+    var recording: Recording
+    
+    var body: some View {
+        VStack {
+            Image(uiImage: recording.thumbnail)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .padding()
+            Text("Initial Diameter: \(recording.initialDiameter) mm")
+            Text("Final Diameter: \(recording.finalDiameter) mm")
+            Text("Percent Change: \(recording.percentChange)%")
+            Text("Average Constriction Velocity: \(recording.averageConstrictionVelocity) mm/s")
+        }
+        .navigationTitle("Recording Detail")
+        .padding()
+    }
+}
+
+
+struct Recording: Identifiable {
+    var id: UUID = UUID()
+    var thumbnail: UIImage
+    var initialDiameter: Double
+    var finalDiameter: Double
+    var percentChange: Double
+    var averageConstrictionVelocity: Double
+}
 
 
 struct ContentView_Previews: PreviewProvider {
