@@ -87,8 +87,17 @@ struct ContentView: View {
     
     func populateSampleData() {
         let sampleThumbnail = UIImage(named: "SamplePupil") ?? UIImage()
+        
+        let initialDiameter = Double.random(in: 4.00...6.00).rounded(toPlaces: 2)
+        let finalDiameter = Double.random(in: 2.75...4.00).rounded(toPlaces: 2)
+
+        // Calculate percentChange and other values if necessary
+        let percentChange = ((finalDiameter - initialDiameter) / initialDiameter) * 100
+        
+        let averageConstrictionVelocity = abs(finalDiameter - initialDiameter) / 3
+        
         recordings = [
-            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.2, finalDiameter: 3.5, percentChange: -32.7, averageConstrictionVelocity: 0.22, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail, timestamp: Date())
+            Recording(thumbnail: sampleThumbnail, initialDiameter: initialDiameter, finalDiameter: finalDiameter, percentChange: percentChange, averageConstrictionVelocity: averageConstrictionVelocity, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail, timestamp: Date())
         ]
     }
     
@@ -459,12 +468,15 @@ extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
         
         // Assume extractFrames is a method that extracts first and last frames
         extractFrames(from: outputFileURL) { firstFrame, lastFrame in
+            let initialDiameter = Double.random(in: 4.00...6.00).rounded(toPlaces: 2)
+            let finalDiameter = Double.random(in: 2.75...4.00).rounded(toPlaces: 2)
+            
             let recording = Recording(
                 thumbnail: UIImage(), // Placeholder for thumbnail
-                initialDiameter: 0.0, // Placeholder
-                finalDiameter: 0.0, // Placeholder
-                percentChange: 0.0, // Placeholder
-                averageConstrictionVelocity: 0.0, // Placeholder
+                initialDiameter: initialDiameter, // Placeholder
+                finalDiameter: finalDiameter, // Placeholder
+                percentChange: ((finalDiameter - initialDiameter) / initialDiameter) * 100, // Placeholder
+                averageConstrictionVelocity: abs(finalDiameter - initialDiameter) / 3, // Placeholder
                 firstFrame: firstFrame ?? UIImage(),
                 lastFrame: lastFrame ?? UIImage(),
                 timestamp: Date()
@@ -606,6 +618,14 @@ extension Notification.Name {
     static let newRecording = Notification.Name("newRecording")
 }
 
+
+extension Double {
+    /// Rounds the double to decimal places value
+    func rounded(toPlaces places:Int) -> Double {
+        let divisor = pow(10.0, Double(places))
+        return (self * divisor).rounded() / divisor
+    }
+}
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
