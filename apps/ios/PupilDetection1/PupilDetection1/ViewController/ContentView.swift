@@ -14,7 +14,7 @@ import CoreHaptics
 struct ContentView: View {
     @State private var recordings: [Recording] = []
     @State private var isShowingCamera = false
-
+    
     var body: some View {
         NavigationView {
             VStack {
@@ -22,37 +22,40 @@ struct ContentView: View {
                     Text("👁️ Visualyze")
                         .font(.largeTitle)
                         .padding(.top)
-
+                    
                     Text("Measure pupil dilation and constriction.")
                         .font(.headline)
                         .foregroundColor(.secondary)
                 }
                 .padding(.bottom)
-
+                
                 Divider()
-
+                
                 List {
                     Section(header: Text("Recordings").font(.headline).foregroundColor(.primary)) {
                         ForEach(recordings) { recording in
                             NavigationLink(destination: RecordingDetailView(recording: recording)) {
                                 HStack {
-                                    Image(uiImage: recording.thumbnail)
+                                    Image(uiImage: recording.firstFrame)
                                         .resizable()
                                         .frame(width: 50, height: 50)
                                         .clipShape(Circle())
                                     VStack(alignment: .leading) {
-                                        Text("Initial: \(recording.initialDiameter) mm")
-                                        Text("Final: \(recording.finalDiameter) mm")
+                                        Text(dateToString(recording.timestamp))
+                                            .font(.headline).bold()
+                                        Text(timeToString(recording.timestamp))
+                                            .font(.subheadline)
                                     }
+                                    .padding(.leading, 8)
                                 }
                             }
                         }
                     }
                 }
                 .listStyle(InsetGroupedListStyle())
-
+                
                 Spacer()
-
+                
                 Button(action: {
                     isShowingCamera.toggle()
                 }) {
@@ -72,7 +75,7 @@ struct ContentView: View {
         .onAppear {
             NotificationCenter.default.addObserver(forName: .newRecording, object: nil, queue: .main) { notification in
                 if let userInfo = notification.userInfo, let newRecording = userInfo["recording"] as? Recording {
-                    self.recordings.append(newRecording)
+                    self.recordings.insert(newRecording, at: 0)
                 }
             }
             populateSampleData()
@@ -81,14 +84,26 @@ struct ContentView: View {
             NotificationCenter.default.removeObserver(self, name: .newRecording, object: nil)
         }
     }
-
+    
     func populateSampleData() {
-        let sampleThumbnail = UIImage(systemName: "eye") ?? UIImage()
+        let sampleThumbnail = UIImage(named: "SamplePupil") ?? UIImage()
         recordings = [
-            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.0, finalDiameter: 3.0, percentChange: -40.0, averageConstrictionVelocity: 0.2, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail),
-            Recording(thumbnail: sampleThumbnail, initialDiameter: 4.5, finalDiameter: 2.8, percentChange: -37.8, averageConstrictionVelocity: 0.25, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail),
-            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.2, finalDiameter: 3.5, percentChange: -32.7, averageConstrictionVelocity: 0.22, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail)
+            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.2, finalDiameter: 3.5, percentChange: -32.7, averageConstrictionVelocity: 0.22, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail, timestamp: Date())
         ]
+    }
+    
+    private func dateToString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d, yyyy" // Full month name, day, year
+        return formatter.string(from: date)
+    }
+    
+    private func timeToString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a" // Hour:Minute AM/PM
+        formatter.amSymbol = "a.m."
+        formatter.pmSymbol = "p.m."
+        return formatter.string(from: date).lowercased() // Ensure lowercase AM/PM indicators
     }
 }
 
@@ -165,7 +180,7 @@ class CustomCameraViewController: UIViewController {
     
     private let dismissButton: UIButton = {
         let button = UIButton(type: .system)
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium, scale: .medium)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 25, weight: .medium, scale: .medium)
         button.setImage(UIImage(systemName: "xmark.circle.fill", withConfiguration: symbolConfig), for: .normal)
         button.tintColor = .white
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -248,7 +263,7 @@ class CustomCameraViewController: UIViewController {
     @objc private func dismissCameraView() {
         dismissHandler?()
     }
-
+    
     
     private func hapticFeedbackStartRecording() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
@@ -451,32 +466,36 @@ extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
                 percentChange: 0.0, // Placeholder
                 averageConstrictionVelocity: 0.0, // Placeholder
                 firstFrame: firstFrame ?? UIImage(),
-                lastFrame: lastFrame ?? UIImage()
+                lastFrame: lastFrame ?? UIImage(),
+                timestamp: Date()
             )
             
             NotificationCenter.default.post(name: .newRecording, object: nil, userInfo: ["recording": recording])
         }
+        DispatchQueue.main.async {
+            self.dismissHandler?()
+        }
     }
-
-
+    
+    
     private func extractFrames(from videoURL: URL, completion: @escaping (UIImage?, UIImage?) -> Void) {
         let asset = AVAsset(url: videoURL)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-
+        
         let times = [NSValue(time: CMTimeMake(value: 0, timescale: 1)), NSValue(time: asset.duration)]
         var firstFrame: UIImage?
         var lastFrame: UIImage?
-
+        
         generator.generateCGImagesAsynchronously(forTimes: times) { requestedTime, image, actualTime, result, error in
             guard let cgImage = image else { return }
-
+            
             if requestedTime == CMTimeMake(value: 0, timescale: 1) {
                 firstFrame = UIImage(cgImage: cgImage)
             } else {
                 lastFrame = UIImage(cgImage: cgImage)
             }
-
+            
             if firstFrame != nil && lastFrame != nil {
                 completion(firstFrame, lastFrame)
             }
@@ -519,32 +538,56 @@ extension CustomCameraViewController: AVCaptureVideoDataOutputSampleBufferDelega
 struct RecordingDetailView: View {
     var recording: Recording
     
+    private func dateToString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d, yyyy" // Full month name, day, year
+        return formatter.string(from: date)
+    }
+    
+    private func timeToString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a" // Hour:Minute AM/PM
+        formatter.amSymbol = "a.m."
+        formatter.pmSymbol = "p.m."
+        return formatter.string(from: date).lowercased() // Ensure lowercase AM/PM indicators
+    }
+    
     var body: some View {
-        VStack {
-            HStack {
-                Image(uiImage: recording.firstFrame) // Display the first frame
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .padding()
-                Image(uiImage: recording.lastFrame) // Display the last frame
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .padding()
+        List {
+            Section(header: Text("Pupil Images")) {
+                HStack(spacing: 20) {
+                    Spacer()
+                    Image(uiImage: recording.firstFrame)
+                        .resizable()
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .padding(5)
+                    
+                    Image(uiImage: recording.lastFrame)
+                        .resizable()
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .padding(5)
+                    Spacer()
+                }
+                .frame(height: 200) // Specify a height to ensure images are displayed properly
             }
-            /* Image(uiImage: recording.thumbnail)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .padding()
-             */
-            Text("Initial Diameter: \(recording.initialDiameter) mm")
-            Text("Final Diameter: \(recording.finalDiameter) mm")
-            Text("Percent Change: \(recording.percentChange)%")
-            Text("Average Constriction Velocity: \(recording.averageConstrictionVelocity) mm/s")
+            
+            Section(header: Text("Measurement Details")) {
+                Text("Initial Diameter: \(recording.initialDiameter, specifier: "%.2f") mm")
+                Text("Final Diameter: \(recording.finalDiameter, specifier: "%.2f") mm")
+                Text("Percent Change: \(recording.percentChange, specifier: "%.2f")%")
+                Text("Average Constriction Velocity: \(recording.averageConstrictionVelocity, specifier: "%.2f") mm/s")
+                Text("Date: \(dateToString(recording.timestamp))")
+                Text("Time: \(timeToString(recording.timestamp))")
+            }
         }
-        .navigationTitle("Recording Detail")
-        .padding()
+        .listStyle(InsetGroupedListStyle())
+        .navigationTitle("Recording Details")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
+
 
 
 struct Recording: Identifiable {
@@ -556,6 +599,7 @@ struct Recording: Identifiable {
     var averageConstrictionVelocity: Double
     var firstFrame: UIImage
     var lastFrame: UIImage
+    var timestamp: Date
 }
 
 extension Notification.Name {
