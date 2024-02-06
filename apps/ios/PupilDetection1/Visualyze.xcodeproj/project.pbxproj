@@ -224,7 +224,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 21F66D162B6B155B00B16C99 /* Build configuration list for PBXProject "PupilDetection1" */;
+			buildConfigurationList = 21F66D162B6B155B00B16C99 /* Build configuration list for PBXProject "Visualyze" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -444,6 +444,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PupilDetection1/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Visualyze;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses the camera to capture videos to record the eye";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app uses the camera to capture videos to record the eye";
@@ -479,6 +481,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PupilDetection1/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Visualyze;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses the camera to capture videos to record the eye";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app uses the camera to capture videos to record the eye";
@@ -585,7 +589,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		21F66D162B6B155B00B16C99 /* Build configuration list for PBXProject "PupilDetection1" */ = {
+		21F66D162B6B155B00B16C99 /* Build configuration list for PBXProject "Visualyze" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				21F66D3D2B6B155C00B16C99 /* Debug */,
