@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Photos
+import AVFoundation
 import Vision
 import CoreHaptics
 
@@ -16,24 +17,22 @@ struct ContentView: View {
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 16) {
-                Text("👁️ Pupillometer")
-                    .font(.largeTitle)
-                    .padding(.top)
+            VStack {
+                VStack(alignment: .center, spacing: 0) {
+                    Text("👁️ Pupillometer")
+                        .font(.largeTitle)
+                        .padding(.top)
 
-                Text("Measure pupil dilation and constriction.")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                
-                // Use ScrollView to ensure content is scrollable when exceeding screen bounds
-                ScrollView {
-                    VStack(alignment: .leading) {
-                        Text("Recordings")
-                            .font(.headline)
-                            .padding(.leading)
-                            .padding(.top)
+                    Text("Measure pupil dilation and constriction.")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.bottom)
 
-                        // This List shows the recordings
+                Divider()
+
+                List {
+                    Section(header: Text("Recordings").font(.headline).foregroundColor(.primary)) {
                         ForEach(recordings) { recording in
                             NavigationLink(destination: RecordingDetailView(recording: recording)) {
                                 HStack {
@@ -46,12 +45,11 @@ struct ContentView: View {
                                         Text("Final: \(recording.finalDiameter) mm")
                                     }
                                 }
-                                .padding(.horizontal)
                             }
-                            .padding(.vertical, 4)
                         }
                     }
                 }
+                .listStyle(InsetGroupedListStyle())
 
                 Spacer()
 
@@ -68,20 +66,28 @@ struct ContentView: View {
                 .padding(.bottom)
             }
             .fullScreenCover(isPresented: $isShowingCamera, content: CustomCameraView.init)
-            .navigationBarHidden(true) // Hide the navigation bar to use custom titles
-            .padding()
+            .navigationBarHidden(true)
+            .padding(.horizontal)
         }
         .onAppear {
+            NotificationCenter.default.addObserver(forName: .newRecording, object: nil, queue: .main) { notification in
+                if let userInfo = notification.userInfo, let newRecording = userInfo["recording"] as? Recording {
+                    self.recordings.append(newRecording)
+                }
+            }
             populateSampleData()
+        }
+        .onDisappear {
+            NotificationCenter.default.removeObserver(self, name: .newRecording, object: nil)
         }
     }
 
     func populateSampleData() {
         let sampleThumbnail = UIImage(systemName: "eye") ?? UIImage()
         recordings = [
-            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.0, finalDiameter: 3.0, percentChange: -40.0, averageConstrictionVelocity: 0.2),
-            Recording(thumbnail: sampleThumbnail, initialDiameter: 4.5, finalDiameter: 2.8, percentChange: -37.8, averageConstrictionVelocity: 0.25),
-            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.2, finalDiameter: 3.5, percentChange: -32.7, averageConstrictionVelocity: 0.22)
+            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.0, finalDiameter: 3.0, percentChange: -40.0, averageConstrictionVelocity: 0.2, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail),
+            Recording(thumbnail: sampleThumbnail, initialDiameter: 4.5, finalDiameter: 2.8, percentChange: -37.8, averageConstrictionVelocity: 0.25, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail),
+            Recording(thumbnail: sampleThumbnail, initialDiameter: 5.2, finalDiameter: 3.5, percentChange: -32.7, averageConstrictionVelocity: 0.22, firstFrame: sampleThumbnail, lastFrame: sampleThumbnail)
         ]
     }
 }
@@ -242,6 +248,7 @@ class CustomCameraViewController: UIViewController {
     @objc private func dismissCameraView() {
         dismissHandler?()
     }
+
     
     private func hapticFeedbackStartRecording() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
@@ -430,20 +437,53 @@ class CustomCameraViewController: UIViewController {
 
 extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-        // Handle video saving to camera roll here
-        PHPhotoLibrary.shared().performChanges({
-            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: outputFileURL)
-        }) { saved, error in
-            if saved {
-                DispatchQueue.main.async {
-                    let alert = UIAlertController(title: "Scan Complete", message: "Your video has been saved to Photos and is ready to use for pupil examination.", preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self.present(alert, animated: true)
-                }
+        guard error == nil else {
+            print("Error recording video: \(error!.localizedDescription)")
+            return
+        }
+        
+        // Assume extractFrames is a method that extracts first and last frames
+        extractFrames(from: outputFileURL) { firstFrame, lastFrame in
+            let recording = Recording(
+                thumbnail: UIImage(), // Placeholder for thumbnail
+                initialDiameter: 0.0, // Placeholder
+                finalDiameter: 0.0, // Placeholder
+                percentChange: 0.0, // Placeholder
+                averageConstrictionVelocity: 0.0, // Placeholder
+                firstFrame: firstFrame ?? UIImage(),
+                lastFrame: lastFrame ?? UIImage()
+            )
+            
+            NotificationCenter.default.post(name: .newRecording, object: nil, userInfo: ["recording": recording])
+        }
+    }
+
+
+    private func extractFrames(from videoURL: URL, completion: @escaping (UIImage?, UIImage?) -> Void) {
+        let asset = AVAsset(url: videoURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+
+        let times = [NSValue(time: CMTimeMake(value: 0, timescale: 1)), NSValue(time: asset.duration)]
+        var firstFrame: UIImage?
+        var lastFrame: UIImage?
+
+        generator.generateCGImagesAsynchronously(forTimes: times) { requestedTime, image, actualTime, result, error in
+            guard let cgImage = image else { return }
+
+            if requestedTime == CMTimeMake(value: 0, timescale: 1) {
+                firstFrame = UIImage(cgImage: cgImage)
+            } else {
+                lastFrame = UIImage(cgImage: cgImage)
+            }
+
+            if firstFrame != nil && lastFrame != nil {
+                completion(firstFrame, lastFrame)
             }
         }
     }
 }
+
 
 extension CustomCameraViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -481,6 +521,14 @@ struct RecordingDetailView: View {
     
     var body: some View {
         VStack {
+            Image(uiImage: recording.firstFrame) // Display the first frame
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .padding()
+            Image(uiImage: recording.lastFrame) // Display the last frame
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .padding()
             Image(uiImage: recording.thumbnail)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -503,6 +551,12 @@ struct Recording: Identifiable {
     var finalDiameter: Double
     var percentChange: Double
     var averageConstrictionVelocity: Double
+    var firstFrame: UIImage
+    var lastFrame: UIImage
+}
+
+extension Notification.Name {
+    static let newRecording = Notification.Name("newRecording")
 }
 
 
