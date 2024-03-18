@@ -38,6 +38,7 @@ struct ContentView: View {
                                 HStack {
                                     Image(uiImage: recording.firstFrame)
                                         .resizable()
+                                        .aspectRatio(contentMode: .fill)
                                         .frame(width: 50, height: 50)
                                         .clipShape(Circle())
                                     VStack(alignment: .leading) {
@@ -502,15 +503,38 @@ extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
         generator.generateCGImagesAsynchronously(forTimes: times) { requestedTime, image, actualTime, result, error in
             guard let cgImage = image else { return }
             
+            let croppedImage = self.cropToSquare(image: cgImage)
+            
             if requestedTime == CMTimeMake(value: 0, timescale: 1) {
-                firstFrame = UIImage(cgImage: cgImage)
+                firstFrame = croppedImage
             } else {
-                lastFrame = UIImage(cgImage: cgImage)
+                lastFrame = croppedImage
             }
             
             if firstFrame != nil && lastFrame != nil {
                 completion(firstFrame, lastFrame)
             }
+        }
+    }
+    
+    private func cropToSquare(image: CGImage, cropFactor: CGFloat = 0.30) -> UIImage? {
+        // Ensure cropFactor is between 0 and 1, where 1 means no extra cropping (just square), and closer to 0 means more cropping.
+        let validCropFactor = min(max(cropFactor, 0), 1)
+        
+        let contextSize = CGSize(width: image.width, height: image.height)
+        
+        let minLength = CGFloat(min(image.width, image.height))
+        let cropLength = minLength * validCropFactor // Apply cropFactor to reduce the size
+        
+        // Recalculate offsets to center the smaller crop area
+        let offsetX = (contextSize.width - cropLength) / 2
+        let offsetY = (contextSize.height - cropLength) / 2
+        let cropRect = CGRect(x: offsetX, y: offsetY, width: cropLength, height: cropLength)
+        
+        if let cropped = image.cropping(to: cropRect) {
+            return UIImage(cgImage: cropped)
+        } else {
+            return nil
         }
     }
 }
