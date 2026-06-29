@@ -1,0 +1,22 @@
+# --- data & generated outputs (privacy: real faces/eyes; also large) ---
+data/
+debug_frames/
+debug_masks/
+# ROI boxes tied to the private clips; useless without them
+eye_rois.json
+
+# --- third-party: clone RITnet separately (see README), do not vendor its repo ---
+RITnet/
+
+# --- local working docs (not for the public repo) ---
+CLAUDE.md
+pupillometry_plan.md
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# --- os / editor ---
+.DS_Store
+.vscode/

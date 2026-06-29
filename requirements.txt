@@ -1,0 +1,5 @@
+opencv-python==4.10.0.84   # pinned: 4.11+ requires numpy>=2, which breaks scipy/numba
+numpy<1.25
+torch>=2.6                  # weights_only=True default for safe checkpoint loading
+torchvision
+matplotlib
