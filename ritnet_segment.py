@@ -35,6 +35,7 @@ IN_W, IN_H  = 400, 640        # RITnet/OpenEDS native (W x H), portrait. Divisib
 N_SAMPLE    = 9               # frames sampled evenly across each clip, for visual validation
 DEVICE      = "cpu"           # validation is a handful of frames; CPU is plenty. "mps" later for the full curve.
 MIN_PTS     = 5               # fitEllipse needs >= 5 contour points
+LIMBUS_BUFFER = 6             # px; a limbus point farther than this from the fitted circle is trimmed
 
 # RITnet needs the EYE TO FILL THE FRAME (it was trained on near-eye OpenEDS images).
 # Our clips show the whole face, so we crop to an eye ROI first. The camera is static
@@ -100,20 +101,52 @@ def segment(gray):
 # reliably. Off-axis foreshortening is a stated small error and mostly cancels in the ratio.
 
 def fit_circle(xs, ys):
-    """Least-squares circle through points (xs, ys) -> (cx, cy, r).
-
-    TODO (Angela): algebraic (Kasa) least-squares fit.
+    """Least-squares circle through points (xs, ys) -> (cx, cy, r) algebraic (Kasa) least-squares fit.
     Hint: rearrange (x-cx)^2 + (y-cy)^2 = r^2 into the LINEAR form
           x^2 + y^2 = 2*cx*x + 2*cy*y + (r^2 - cx^2 - cy^2).
     Build A = [2x, 2y, 1], b = x^2 + y^2, solve A @ [cx, cy, c] = b (np.linalg.lstsq),
     then r = sqrt(c + cx^2 + cy^2). Think about why this is linear in the unknowns even
     though a circle is 'nonlinear' (that is the lesson)."""
-    raise NotImplementedError("fit_circle: your Kasa least-squares fit goes here")
+    n = xs.size
+    A = np.empty((n, 3))
+    b = np.empty(n)
+    for i in range(n):
+        A[i][0] = 2 * xs[i]
+        A[i][1] = 2 * ys[i]
+        A[i][2] = 1
+        b[i] = xs[i]**2 + ys[i]**2
+    [cx, cy, c], *_ = np.linalg.lstsq(A, b, rcond=None)
+    r = np.sqrt(c + cx**2 + cy**2)
+    
+    return (cx, cy, r)
+
+
+def fit_circle_robust(xs, ys):
+    """Fit a circle, drop points more than `buffer` px off it, refit. Trimmed least-squares.
+    NOTE: the loop is fine here; RITnet inference dominates the per-frame cost. If a full-curve
+    profile ever flags this, vectorize with a boolean mask (dist = np.hypot(...); keep = ...)."""
+    xs = np.asarray(xs, float); ys = np.asarray(ys, float)   # so .size / xs[i] work if given lists
+    cx, cy, r = fit_circle(xs, ys)                           # first pass, all points
+    buffer = LIMBUS_BUFFER
+    passes = 3
+    for _ in range(passes):
+        new_xs, new_ys = [], []
+        for i in range(xs.size):
+            dist_from_center = np.hypot(xs[i] - cx, ys[i] - cy)
+            if r - buffer < dist_from_center < r + buffer:
+                new_xs.append(xs[i])
+                new_ys.append(ys[i])
+        if len(new_xs) < MIN_PTS:                                # trimmed too hard -> keep first fit
+            break
+        
+        cx, cy, r = fit_circle(np.array(new_xs, float), np.array(new_ys, float))
+    return cx, cy, r
+
 
 def iris_limbus_points(mask):
     """4-class mask -> (xs, ys) arrays of iris-boundary pixels that border the SCLERA.
 
-    TODO (Angela). Suggested steps (you decide the exact ops):
+    Suggested steps (you decide the exact ops):
       1. iris_disk = (mask == CLS_IRIS) | (mask == CLS_PUPIL)        # full disk, ring + pupil
       2. boundary  = iris_disk AND NOT erode(iris_disk)              # 1-px rim of the disk
       3. near_sclera = dilate(mask == CLS_SCLERA, a few px)          # where sclera is adjacent
@@ -121,24 +154,47 @@ def iris_limbus_points(mask):
       5. ys, xs = np.where(limbus); return xs, ys
     The point of step 3-4: use the class RITnet is GOOD at (sclera) to qualify which iris
     boundary points are trustworthy. Lid-occluded boundary touches background, not sclera."""
-    raise NotImplementedError("iris_limbus_points: your sclera-adjacency selection goes here")
+    iris_disk = (mask == CLS_IRIS) | (mask == CLS_PUPIL)
+    num, labels, stats, _ = cv2.connectedComponentsWithStats(iris_disk.astype(np.uint8))
+    if num > 1:                                              # >1 means at least one real blob
+        largest = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA]) # skip bg (row 0), +1 to re-index
+        iris_disk = (labels == largest)
+    k = np.ones((3, 3), np.uint8)
+    eroded  = cv2.erode(iris_disk.astype(np.uint8), k).astype(bool)
+    boundary = iris_disk & ~(eroded)
+    near_sclera = cv2.dilate((mask == CLS_SCLERA).astype(np.uint8), k, iterations = 2).astype(bool)
+    limbus = boundary & near_sclera
+    ys, xs = np.where(limbus)
+    return xs, ys
+
 
 def iris_circle(mask):
     """Mask -> (cx, cy, r) iris circle in RITnet-input pixels, or None. Wiring only."""
     xs, ys = iris_limbus_points(mask)
     if xs is None or len(xs) < MIN_PTS:
         return None
-    cx, cy, r = fit_circle(np.asarray(xs, float), np.asarray(ys, float))
+    cx, cy, r = fit_circle_robust(np.asarray(xs, float), np.asarray(ys, float))
     if not np.isfinite([cx, cy, r]).all() or r <= 0:
         return None
     return (float(cx), float(cy), float(r))
 
 def measure(mask):
     """Class mask -> per-frame measurement dict. PART 1 only for now: iris circle.
-    Pupil (Part 2) and the geometry gate (Part 3) get added next."""
-    ic = iris_circle(mask)
+    Also returns the limbus points used, for debugging the selection."""
+    xs, ys = iris_limbus_points(mask)                # the points that feed the fit
+    ic = None
+    limbus_in = limbus_out = None
+    if xs is not None and len(xs) >= MIN_PTS:
+        cx, cy, r = fit_circle_robust(np.asarray(xs, float), np.asarray(ys, float))
+        if np.isfinite([cx, cy, r]).all() and r > 0:
+            ic = (float(cx), float(cy), float(r))
+            # split the raw points by agreement with the FINAL circle, for the overlay
+            keep = np.abs(np.hypot(xs - cx, ys - cy) - r) < LIMBUS_BUFFER
+            limbus_in  = (xs[keep],  ys[keep])       # green: used by the fit
+            limbus_out = (xs[~keep], ys[~keep])      # red: trimmed / ignored
     iris_px = 2.0 * ic[2] if ic else np.nan          # diameter = 2r
-    return dict(iris_circle=ic, iris_px=iris_px,
+    return dict(iris_circle=ic, iris_px=iris_px, limbus_xy=(xs, ys),
+                limbus_in=limbus_in, limbus_out=limbus_out,
                 pupil_circle=None, pupil_px=np.nan, ratio=np.nan)  # pupil filled in Part 2
 
 # %% [test] fit_circle in isolation  <-- delegable: validates YOUR circle math, no RITnet needed
@@ -175,6 +231,39 @@ _check("one side (limit)", CX, CY, R, *_circle_points(CX, CY, R, ang[one], noise
 
 print("\nfit_circle: asserted cases passed")
 
+# %% [test] fit_circle_robust convergence  <-- delegable: proves the iteration rejects outliers
+# Plant a known circle (side arcs, like a real lidded iris), then inject the two junk types
+# we actually see: a CENTER BLOB (reflection mislabeled as sclera) and a LID STRAND (iris label
+# smeared along the lid). The naive one-shot fit gets dragged off; the iterated robust fit should
+# recover the true circle. Run cells: imports -> Part 1 -> this.
+rng = np.random.default_rng(7)
+
+# good limbus: left/right arcs of the true circle, with noise (this is the signal)
+gx, gy = _circle_points(CX, CY, R, ang[np.abs(np.cos(ang)) > 0.34], noise=1.5, seed=3)
+
+# outlier 1: center blob (~90px inside the true circle -> should be trimmed)
+bx = CX + rng.uniform(-12, 12, 25)
+by = CY + rng.uniform(-12, 12, 25)
+
+# outlier 2: lid strand, a short off-circle arc ~18px outside the top (-> should be trimmed)
+sx = CX + rng.uniform(-30, 30, 15)
+sy = (CY - (R + 18)) + rng.uniform(-3, 3, 15)
+
+x_all = np.concatenate([gx, bx, sx])
+y_all = np.concatenate([gy, by, sy])
+
+ncx, ncy, nr = fit_circle(x_all, y_all)                 # naive, one shot (all points)
+rcx, rcy, rr = fit_circle_robust(x_all, y_all)          # iterated, trims outliers
+naive_err  = abs(nr - R)
+robust_c   = float(np.hypot(rcx - CX, rcy - CY))
+robust_r   = float(abs(rr - R))
+print(f"naive  fit: r={nr:5.1f}  radius_err={naive_err:5.2f}")
+print(f"robust fit: r={rr:5.1f}  center_err={robust_c:5.2f}  radius_err={robust_r:5.2f}")
+
+assert robust_c < 3.0 and robust_r < 3.0, "robust fit did not recover the true circle"
+assert robust_r < naive_err, "robust fit should beat the naive fit on the contaminated set"
+print("fit_circle_robust: converged and beat the naive fit")
+
 # %% [overlay helper]  <-- delegable debug dump
 def _draw_circle(img, circ, color):
     if circ is None:
@@ -184,10 +273,21 @@ def _draw_circle(img, circ, color):
     cv2.circle(img, (int(round(cx)), int(round(cy))), 2, color, -1)   # center dot
 
 def overlay(frame_bgr, m):
-    """Resize the original frame to RITnet input size and draw iris (blue) + pupil (green)."""
+    """Resize to RITnet input size, draw the fitted iris (blue), and scatter limbus points:
+    green = kept by the fit, red = trimmed. If the split isn't available, all points in red."""
     vis = cv2.resize(frame_bgr, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
-    _draw_circle(vis, m.get("iris_circle"),  (255, 0, 0))   # blue  = iris (Part 1)
-    _draw_circle(vis, m.get("pupil_circle"), (0, 255, 0))   # green = pupil (Part 2, later)
+
+    def _scatter(xy, color):
+        if xy is not None and xy[0] is not None and len(xy[0]) > 0:
+            xs, ys = xy
+            vis[np.clip(ys, 0, IN_H - 1), np.clip(xs, 0, IN_W - 1)] = color
+
+    if m.get("limbus_in") is not None:
+        _scatter(m.get("limbus_out"), (0, 0, 255))   # red   = trimmed (ignored by the fit)
+        _scatter(m.get("limbus_in"),  (0, 255, 0))   # green = kept (used by the fit)
+    else:
+        _scatter(m.get("limbus_xy"),  (0, 0, 255))   # fallback: raw points, all red
+    _draw_circle(vis, m.get("iris_circle"), (255, 0, 0))   # blue = fitted iris circle
     return vis
 
 # %% [eye ROI]  <-- delegable: crop the eye so it fills the frame, RITnet-style
@@ -307,9 +407,11 @@ for clip in clips:
         mask = segment(gray)
         m = measure(mask)
         cv2.imwrite(str(sub / f"frame_{int(i):05d}.png"), overlay(frame, m))
-        print(f"  f{int(i):5d}  iris={m['iris_px']:6.1f}px  (Part 1; pupil + ratio come in Part 2)")
+        nlp = 0 if m["limbus_xy"][0] is None else len(m["limbus_xy"][0])
+        print(f"  f{int(i):5d}  iris={m['iris_px']:6.1f}px  limbus_pts={nlp:4d}")
     cap.release()
-print(f"\nwrote overlays to {out_root}/<clip>/ -- open them: green should hug the pupil, blue the iris (limbus)")
+print(f"\nwrote overlays to {out_root.resolve()}/<clip>/")
+print("red dots = limbus points used; blue = fitted iris circle. Red should hug the iris/SCLERA edge (sides).")
 
 # %% [optional] inspect the raw 4-class mask for one frame (sanity-check the classes)
 # Uncomment to see what RITnet actually labels. Useful if a brown iris gets merged into pupil.

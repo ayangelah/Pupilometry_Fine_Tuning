@@ -20,3 +20,6 @@ __pycache__/
 # --- os / editor ---
 .DS_Store
 .vscode/
+
+# local math notes (not for the repo)
+circle_fit_math.md
