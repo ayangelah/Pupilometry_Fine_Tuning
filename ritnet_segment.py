@@ -2,7 +2,7 @@
 # Phase 1b: run RITnet on the real close-up clips and VALIDATE the pupil+iris masks.
 # RITnet = small pretrained 4-class eye-segmentation U-Net (bg / sclera / iris / pupil).
 #
-# SPINE (Angela owns, interviewer will probe):
+# SPINE:
 #   - the detector CHOICE (RITnet) and, later, its fine-tune train/eval
 #   - the diameter DEFINITION: diameter = mean of the two fitted-ellipse axes
 #     (kept identical to the classical baseline so the two detectors are comparable)
@@ -33,9 +33,40 @@ CLIPS_DIR   = "data/clips"
 WEIGHTS     = RITNET_DIR / "best_model.pkl"
 IN_W, IN_H  = 400, 640        # RITnet/OpenEDS native (W x H), portrait. Divisible by 16.
 N_SAMPLE    = 9               # frames sampled evenly across each clip, for visual validation
-DEVICE      = "cpu"           # validation is a handful of frames; CPU is plenty. "mps" later for the full curve.
+# Apple-Silicon GPU (mps) when available, else CPU. On this laptop mps is ~4.5x faster on
+# the RITnet forward pass (472ms -> 103ms/frame), which is the bottleneck for full-clip runs.
+# Override to "cpu" if an mps op ever misbehaves. Weights load on CPU then move to DEVICE.
+DEVICE      = "mps" if torch.backends.mps.is_available() else "cpu"
 MIN_PTS     = 5               # fitEllipse needs >= 5 contour points
 LIMBUS_BUFFER = 6             # px; a limbus point farther than this from the fitted circle is trimmed
+
+# Part 2 pupil detection: specular-glint removal (bright AND colorless == a reflection)
+GLINT_V      = 220            # value/brightness (0-255) above which a pixel may be glint
+GLINT_S      = 60             # saturation (0-255) below which it is colorless enough to be glint
+GLINT_DILATE = 3             # grow the glint mask this many px before inpainting (halo bleeds out)
+
+# --- RGB robustness (optimizations_brainstorm.md, Group B) -------------------
+# B1: RITnet is IR-native. The RED channel penetrates melanin better than a
+# luminance average, so it is a closer visible-light proxy for the pupil/iris
+# contrast RITnet learned on IR. Expected to help most on dark irises. This flag
+# is the entire red-vs-gray ablation: flip it, re-run, compare the overlays.
+USE_RED_CHANNEL = True
+# B3: inpaint saturated glint on the MODEL INPUT before gamma/CLAHE, so CLAHE
+# cannot amplify the blowout into the predicted mask. Distinct from the pupil-
+# stage remove_glint(). Default OFF so the red-vs-gray effect is isolated first;
+# turn on for a second, independent comparison (the doc says ablate each change).
+GLINT_PRESEG = False
+
+# capture / curve
+FPS             = 120.0      # clip frame rate (iPhone). Used for the time axis of the curve.
+
+# Part 3: iris-lock + geometry/temporal quality gate (Angela tunes these thresholds)
+CURVE_STRIDE    = 3          # build the curve from every Nth frame (120fps -> 40fps at 3); speed vs resolution
+GATE_RATIO_MIN  = 0.15       # pupil/iris ratio below this is implausible -> reject that frame
+GATE_RATIO_MAX  = 0.75       # ...or above this
+GATE_CONCENTRIC = 0.25       # pupil center must sit within this fraction of the iris radius of the iris center
+TEMPORAL_WIN    = 7          # rolling-median window (frames) for single-frame spike rejection
+TEMPORAL_K      = 4.0        # reject a point that is > K local-MADs from its rolling median
 
 # RITnet needs the EYE TO FILL THE FRAME (it was trained on near-eye OpenEDS images).
 # Our clips show the whole face, so we crop to an eye ROI first. The camera is static
@@ -85,10 +116,31 @@ def preprocess(gray):
     t = (t - 0.5) / 0.5                               # [-1,1], matches Normalize([0.5],[0.5])
     return t.unsqueeze(0).unsqueeze(0)                # add batch + channel dims
 
+# %% [model input]  <-- delegable: choose the single channel RITnet sees (B1/B3)
+def _inpaint_glint_1ch(chan):
+    """Near-saturated pixels are specular glint; dilate + inpaint BEFORE gamma/CLAHE
+    so CLAHE cannot amplify the blowout into the mask (B3). Single-channel analogue of
+    remove_glint(); no saturation test here, so it can over-inpaint bright skin on the
+    red channel. Ablate it (GLINT_PRESEG) rather than trusting it."""
+    glint = (chan >= GLINT_V).astype(np.uint8)
+    if not glint.any():
+        return chan
+    glint = cv2.dilate(glint, np.ones((GLINT_DILATE, GLINT_DILATE), np.uint8))
+    return cv2.inpaint(chan, glint, 3, cv2.INPAINT_TELEA)
+
+def ritnet_input(bgr):
+    """BGR eye crop (any size) -> single-channel uint8 for RITnet. Red channel (B1) or
+    luminance, with optional pre-segmentation glint inpaint (B3). This is the ONLY place
+    the model's input channel is chosen, so red-vs-gray is a one-flag ablation."""
+    chan = bgr[:, :, 2] if USE_RED_CHANNEL else cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)  # OpenCV is BGR: [...,2]=red
+    if GLINT_PRESEG:
+        chan = _inpaint_glint_1ch(chan)
+    return np.ascontiguousarray(chan)
+
 # %% [segment]  <-- delegable: forward pass -> per-pixel class mask
 @torch.no_grad()
 def segment(gray):
-    """grayscale frame -> (IN_H, IN_W) uint8 mask with class ids 0..3."""
+    """single-channel frame (red or gray, see ritnet_input) -> (IN_H, IN_W) uint8 mask, class ids 0..3."""
     x = preprocess(gray).to(DEVICE)
     out = model(x)                       # (1, 4, IN_H, IN_W)
     mask = out.argmax(dim=1).squeeze(0)  # (IN_H, IN_W)
@@ -178,24 +230,170 @@ def iris_circle(mask):
         return None
     return (float(cx), float(cy), float(r))
 
-def measure(mask):
-    """Class mask -> per-frame measurement dict. PART 1 only for now: iris circle.
-    Also returns the limbus points used, for debugging the selection."""
-    xs, ys = iris_limbus_points(mask)                # the points that feed the fit
+# %% [measurement layer - PART 2: pupil inside the iris]  glint/masking = plumbing; threshold+blob+fit = SPINE (Angela)
+def disk_mask(circle, shape):
+    """Boolean (H, W) mask, True for pixels inside the (cx, cy, r) circle. Plumbing."""
+    cx, cy, r = circle
+    yy, xx = np.ogrid[:shape[0], :shape[1]]
+    return (xx - cx) ** 2 + (yy - cy) ** 2 <= r ** 2
+
+def remove_glint(bgr):
+    """Inpaint specular highlights (bright AND low-saturation) so a glint sitting on the pupil
+    doesn't punch a bright hole in it or bias the fit. Plumbing."""
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+    s, v = hsv[..., 1], hsv[..., 2]
+    glint = ((v >= GLINT_V) & (s <= GLINT_S)).astype(np.uint8) * 255
+    glint = cv2.dilate(glint, np.ones((GLINT_DILATE, GLINT_DILATE), np.uint8))
+    return cv2.inpaint(bgr, glint, 3, cv2.INPAINT_TELEA)
+
+def pupil_in_iris(mask, iris):
+    """Color crop (BGR, IN_H x IN_W) + iris circle (cx, cy, r) -> pupil circle (cx, cy, r) or None.
+    steps:
+      1. inside = disk_mask(iris, bgr.shape[:2])     # only look within the iris        [helper above]
+      2. clean  = remove_glint(bgr)                  # kill specular spots first        [helper above]
+      3. Pick a channel where the pupil pops from the iris. Convert `clean` to HSV (or Lab) and
+         choose one channel. Try saturation S and value V; keep whichever splits best on the
+         dark-iris clip (the 'desaturated-dark pupil vs colored-dark iris' idea).
+      4. LOCAL Otsu on ONLY the iris pixels of that channel (not the whole image):
+             thr, _ = cv2.threshold(channel[inside], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+             pupil_mask = inside & (channel < thr)   # pupil = the low side; flip '<' if needed
+         (cv2.threshold runs Otsu on whatever array you hand it, so channel[inside] computes the
+          threshold from the iris histogram alone. Then you apply it to the full channel yourself.)
+      5. Central blob: connected components on pupil_mask; keep the blob containing / nearest the
+         iris center (cx, cy). Same tool as iris_limbus_points.
+      6. Fit: the pupil is fully visible (not lid-occluded), so fit directly. Reuse fit_circle on
+         the blob boundary, or cv2.minEnclosingCircle. Return (cx, cy, r), or None if none found.
+    """
+    pupil_mask = (mask == CLS_PUPIL)    # RITnet's pupil pixels
+    pupil_mask = cv2.morphologyEx(pupil_mask.astype(np.uint8),
+                                  cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)).astype(bool)  # smooth raggedness
+
+    num, labels, stats, centroids = cv2.connectedComponentsWithStats(pupil_mask.astype(np.uint8))
+    if num <= 1:
+        return None
+    icx, icy = iris[0], iris[1]
+    d = np.hypot(centroids[1:, 0] - icx, centroids[1:, 1] - icy)   # each blob's distance to iris center
+    lbl = 1 + int(np.argmin(d))
+    blob = (labels == lbl)
+    k = np.ones((3, 3), np.uint8)
+    boundary = blob & ~cv2.erode(blob.astype(np.uint8), k).astype(bool)   # the pupil rim
+    ys, xs = np.where(boundary)
+    if len(xs) < MIN_PTS:
+        return None
+    cx, cy, r = fit_circle_robust(xs, ys)
+    return (float(cx), float(cy), float(r))
+
+
+# %% [measure]  combine iris (Part 1) + pupil (Part 2) into one per-frame result
+def measure(mask, bgr):
+    """4-class mask + aligned color crop (both IN_H x IN_W) -> per-frame measurement dict."""
+    xs, ys = iris_limbus_points(mask)                # points that feed the iris fit
     ic = None
     limbus_in = limbus_out = None
     if xs is not None and len(xs) >= MIN_PTS:
         cx, cy, r = fit_circle_robust(np.asarray(xs, float), np.asarray(ys, float))
         if np.isfinite([cx, cy, r]).all() and r > 0:
             ic = (float(cx), float(cy), float(r))
-            # split the raw points by agreement with the FINAL circle, for the overlay
-            keep = np.abs(np.hypot(xs - cx, ys - cy) - r) < LIMBUS_BUFFER
-            limbus_in  = (xs[keep],  ys[keep])       # green: used by the fit
-            limbus_out = (xs[~keep], ys[~keep])      # red: trimmed / ignored
-    iris_px = 2.0 * ic[2] if ic else np.nan          # diameter = 2r
-    return dict(iris_circle=ic, iris_px=iris_px, limbus_xy=(xs, ys),
-                limbus_in=limbus_in, limbus_out=limbus_out,
-                pupil_circle=None, pupil_px=np.nan, ratio=np.nan)  # pupil filled in Part 2
+            keep = np.abs(np.hypot(xs - cx, ys - cy) - r) < LIMBUS_BUFFER   # for the overlay
+            limbus_in  = (xs[keep],  ys[keep])
+            limbus_out = (xs[~keep], ys[~keep])
+    pupil = pupil_in_iris(mask, ic) if ic is not None else None
+    iris_px  = 2.0 * ic[2]    if ic    else np.nan   # diameter = 2r
+    pupil_px = 2.0 * pupil[2] if pupil else np.nan
+    ratio = pupil_px / iris_px if (np.isfinite(pupil_px) and iris_px > 0) else np.nan
+    return dict(iris_circle=ic, iris_px=iris_px, pupil_circle=pupil, pupil_px=pupil_px, ratio=ratio,
+                limbus_xy=(xs, ys), limbus_in=limbus_in, limbus_out=limbus_out)
+
+# %% [measurement layer - PART 3: iris-lock + geometry/temporal gate]  scaffold; Angela tunes GATE_*/TEMPORAL_*
+def lock_iris_radius(radii):
+    """The iris is a fixed ruler within a clip, so its true radius is one constant. Take the
+    median of the finite per-frame radii; that median is robust to the odd bad frame."""
+    radii = np.asarray(radii, float)
+    return float(np.nanmedian(radii)) if np.isfinite(radii).any() else np.nan
+
+def passes_gate(iris_center, iris_r, pupil):
+    """Geometry sanity for one frame's pupil read. Reject if the pupil is not plausibly sized,
+    or not roughly concentric with / contained in the iris. Thresholds are config (GATE_*)."""
+    if pupil is None or iris_center is None or not np.isfinite(iris_r) or iris_r <= 0:
+        return False
+    pcx, pcy, pr = pupil
+    ratio = pr / iris_r
+    if not (GATE_RATIO_MIN <= ratio <= GATE_RATIO_MAX):                  # implausible size
+        return False
+    if np.hypot(pcx - iris_center[0], pcy - iris_center[1]) > GATE_CONCENTRIC * iris_r:  # off-center
+        return False
+    return True
+
+def reject_temporal_outliers(y, window=TEMPORAL_WIN, k=TEMPORAL_K):
+    """Set to NaN any point > k local-MADs from a ROLLING median. Local (not global) so the real
+    constriction, which is a smooth trend, is preserved while single-frame spikes are killed."""
+    y = np.asarray(y, float)
+    out = y.copy()
+    half = window // 2
+    for i in range(len(y)):
+        if not np.isfinite(y[i]):
+            continue
+        w = y[max(0, i - half): i + half + 1]
+        w = w[np.isfinite(w)]
+        if len(w) < 3:
+            continue
+        med = np.median(w)
+        mad = np.median(np.abs(w - med)) + 1e-6
+        if abs(y[i] - med) > k * mad:
+            out[i] = np.nan
+    return out
+
+def build_curve(clip_path, roi, seed_box=None):
+    """One SEQUENTIAL pass over a clip -> pupil-vs-time curve, iris locked and gated.
+    If TRACK_EYE and seed_box (the tight eye_rois box) is given, the eye is FOLLOWED
+    per-frame so handheld drift never pushes it out of the crop (A5); otherwise the fixed
+    `roi` is used for every frame. Reads frames in order (no per-frame seek, which was the
+    slow path on 4K clips) and measures every CURVE_STRIDE-th; tracking still runs every
+    frame so continuity is preserved. Returns dict(t, iris_px, pupil_px, ratio, valid)."""
+    cap = cv2.VideoCapture(str(clip_path))
+    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    tracker, tracking = None, (TRACK_EYE and seed_box is not None)
+    iris_c, iris_r, pupil, kept = [], [], [], []
+    fi = -1
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        fi += 1
+        if tracking:                                                    # follow the eye EVERY frame (continuity)
+            g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if tracker is None:
+                tracker = EyeTracker(g, seed_box); tight = tuple(seed_box)
+            else:
+                tight = tracker.update(g)
+            frame_roi = framed_roi(tight, frame.shape)
+        else:
+            frame_roi = roi
+        if fi % CURVE_STRIDE:                                           # measure only every Nth frame
+            continue
+        fr = crop(frame, frame_roi)
+        crop_bgr = cv2.resize(fr, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
+        m = measure(segment(ritnet_input(fr)), crop_bgr)
+        ic = m["iris_circle"]
+        iris_c.append((ic[0], ic[1]) if ic else None)
+        iris_r.append(ic[2] if ic else np.nan)
+        pupil.append(m["pupil_circle"])
+        kept.append(fi)
+        if len(kept) % 25 == 0:
+            print(f"  ...{fi}/{n} frames processed", end="\r")
+    cap.release()
+    print(f"  {len(kept)} frames measured / {n} total" + (" (eye-tracked)" if tracking else ""))
+
+    locked_r = lock_iris_radius(iris_r)                                  # the fixed ruler for this clip
+    pupil_px = np.array([2.0 * p[2] if p else np.nan for p in pupil], float)
+    for j, (c, p) in enumerate(zip(iris_c, pupil)):                      # gate each frame vs the LOCKED iris
+        if not passes_gate(c, locked_r, p):
+            pupil_px[j] = np.nan
+    pupil_px = reject_temporal_outliers(pupil_px)                        # kill single-frame spikes
+    iris_px = np.full(len(pupil_px), 2.0 * locked_r)
+    t = np.array(kept, float) / FPS
+    return dict(t=t, iris_px=iris_px, pupil_px=pupil_px, ratio=pupil_px / iris_px,
+                valid=np.isfinite(pupil_px))
 
 # %% [test] fit_circle in isolation  <-- delegable: validates YOUR circle math, no RITnet needed
 # Run after implementing fit_circle, BEFORE the full pipeline. Run cells: imports -> Part 1 -> this.
@@ -283,11 +481,12 @@ def overlay(frame_bgr, m):
             vis[np.clip(ys, 0, IN_H - 1), np.clip(xs, 0, IN_W - 1)] = color
 
     if m.get("limbus_in") is not None:
-        _scatter(m.get("limbus_out"), (0, 0, 255))   # red   = trimmed (ignored by the fit)
-        _scatter(m.get("limbus_in"),  (0, 255, 0))   # green = kept (used by the fit)
+        _scatter(m.get("limbus_out"), (0, 0, 255))     # red    = trimmed (ignored by the fit)
+        _scatter(m.get("limbus_in"),  (0, 255, 255))   # yellow = kept limbus points
     else:
-        _scatter(m.get("limbus_xy"),  (0, 0, 255))   # fallback: raw points, all red
-    _draw_circle(vis, m.get("iris_circle"), (255, 0, 0))   # blue = fitted iris circle
+        _scatter(m.get("limbus_xy"),  (0, 0, 255))     # fallback: raw points, all red
+    _draw_circle(vis, m.get("iris_circle"),  (255, 0, 0))   # blue  = fitted iris circle
+    _draw_circle(vis, m.get("pupil_circle"), (0, 255, 0))   # green = fitted pupil circle
     return vis
 
 # %% [eye ROI]  <-- delegable: crop the eye so it fills the frame, RITnet-style
@@ -334,6 +533,42 @@ def crop(frame, roi):
     x, y, w, h = roi
     return frame[y:y + h, x:x + w]
 
+# %% [eye tracking]  <-- delegable (A5): follow the eye per-frame so handheld drift
+# does not push it out of the crop. A single fixed box only works when the camera is
+# static within a clip; on drifting clips (e.g. IMG_4569, ~570px of travel) the eye
+# leaves the frame and the masks fail. This tracks it.
+TRACK_EYE     = True     # per-frame ROI via template tracking; False = one fixed box per clip
+SEARCH_MARGIN = 140      # px searched around the previous eye center (frame-to-frame motion is small at 120fps)
+MATCH_MIN     = 0.30     # normalized-correlation floor; below it we HOLD the last center (blink/blur/eye gone)
+
+class EyeTracker:
+    """Follows the eye across a handheld clip. Seeded from the clip's eye_rois.json box
+    (frame 0 becomes the template). Each frame, normalized cross-correlation (TM_CCOEFF_NORMED,
+    illumination-robust so it survives the flashlight onset) relocates the eye within a window
+    around the last center. The box SIZE stays fixed (the seed size); only its CENTER moves,
+    the same 'fixed ruler, moving center' idea as the iris lock. update() returns a per-frame
+    TIGHT box for framed_roi() to expand to OpenEDS framing. Handles translation, not zoom/roll."""
+    def __init__(self, seed_frame_gray, seed_box):
+        x, y, w, h = seed_box
+        self.tpl = seed_frame_gray[y:y + h, x:x + w].copy()   # frame-0 appearance = the target
+        self.w, self.h = w, h
+        self.cx, self.cy = x + w / 2.0, y + h / 2.0
+        self.last_score = 1.0
+
+    def update(self, frame_gray):
+        H, W = frame_gray.shape
+        x0 = int(max(0, self.cx - self.w / 2 - SEARCH_MARGIN)); y0 = int(max(0, self.cy - self.h / 2 - SEARCH_MARGIN))
+        x1 = int(min(W, self.cx + self.w / 2 + SEARCH_MARGIN)); y1 = int(min(H, self.cy + self.h / 2 + SEARCH_MARGIN))
+        region = frame_gray[y0:y1, x0:x1]
+        if region.shape[0] >= self.h and region.shape[1] >= self.w:
+            res = cv2.matchTemplate(region, self.tpl, cv2.TM_CCOEFF_NORMED)
+            _, score, _, loc = cv2.minMaxLoc(res)
+            self.last_score = float(score)
+            if score >= MATCH_MIN:                            # else: hold last center (occlusion/blur)
+                self.cx = x0 + loc[0] + self.w / 2.0
+                self.cy = y0 + loc[1] + self.h / 2.0
+        return (int(self.cx - self.w / 2), int(self.cy - self.h / 2), self.w, self.h)
+
 # %% [pick ROIs, no GUI]  show each clip's first frame with a pixel grid; fill eye_rois.json
 # HOW TO USE:
 #   1. Run this cell. For each clip you'll see frame 0 with gridlines labeled in pixels.
@@ -377,13 +612,15 @@ clips = sorted(p for p in Path(CLIPS_DIR).glob("*") if p.suffix.lower() in {".mo
 assert clips, f"no videos in {CLIPS_DIR}/"
 out_root = Path("debug_masks"); out_root.mkdir(exist_ok=True)
 rois = _load_rois()
-print(f"{len(clips)} clip(s); sampling {N_SAMPLE} frames each; USE_ROI={USE_ROI}\n")
+# tag overlays by the model-input mode so red-vs-gray runs persist side by side (B1 ablation)
+INPUT_TAG = ("red" if USE_RED_CHANNEL else "gray") + ("_deglint" if GLINT_PRESEG else "")
+print(f"{len(clips)} clip(s); sampling {N_SAMPLE} frames each; USE_ROI={USE_ROI}; input={INPUT_TAG}\n")
 
 for clip in clips:
     cap = cv2.VideoCapture(str(clip))
     n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     idxs = np.linspace(0, max(n - 1, 0), N_SAMPLE, dtype=int)   # evenly spaced across the clip
-    sub = out_root / clip.stem; sub.mkdir(exist_ok=True)
+    sub = out_root / f"{clip.stem}__{INPUT_TAG}"; sub.mkdir(exist_ok=True)
 
     roi = None
     if USE_ROI:
@@ -403,15 +640,97 @@ for clip in clips:
             continue
         if roi is not None:
             frame = crop(frame, roi)
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        mask = segment(gray)
-        m = measure(mask)
-        cv2.imwrite(str(sub / f"frame_{int(i):05d}.png"), overlay(frame, m))
-        nlp = 0 if m["limbus_xy"][0] is None else len(m["limbus_xy"][0])
-        print(f"  f{int(i):5d}  iris={m['iris_px']:6.1f}px  limbus_pts={nlp:4d}")
+        crop_bgr = cv2.resize(frame, (IN_W, IN_H), interpolation=cv2.INTER_AREA)  # color, aligned to mask
+        mask = segment(ritnet_input(frame))
+        m = measure(mask, crop_bgr)
+        cv2.imwrite(str(sub / f"frame_{int(i):05d}.png"), overlay(crop_bgr, m))
+        print(f"  f{int(i):5d}  iris={m['iris_px']:6.1f}px  pupil={m['pupil_px']:6.1f}px  ratio={m['ratio']:.3f}")
     cap.release()
 print(f"\nwrote overlays to {out_root.resolve()}/<clip>/")
-print("red dots = limbus points used; blue = fitted iris circle. Red should hug the iris/SCLERA edge (sides).")
+print("legend: blue=iris circle, green=pupil circle, yellow dots=kept limbus, red dots=trimmed")
+
+# %% [run curve]  build the pupil-vs-time curve for ONE clip (iris locked + gated + spikes removed)
+CURVE_CLIP = "IMG_4599 2"     # <-- clip stem to plot
+_cl = next(p for p in Path(CLIPS_DIR).glob("*") if p.stem == CURVE_CLIP)
+_rois = _load_rois()
+_c0 = cv2.VideoCapture(str(_cl)); _c0.set(cv2.CAP_PROP_POS_FRAMES, 0); _ok0, _f0 = _c0.read(); _c0.release()
+_seed = get_roi(CURVE_CLIP, _f0, _rois)            # TIGHT eye box; seeds the per-frame tracker
+_roi = framed_roi(_seed, _f0.shape)               # fixed-box fallback if TRACK_EYE is off
+cur = build_curve(_cl, _roi, seed_box=_seed)       # eye-tracked when TRACK_EYE; sequential read (faster)
+print(f"{CURVE_CLIP}: {cur['valid'].mean() * 100:.0f}% frames valid, locked iris = {cur['iris_px'][0]:.1f}px")
+
+fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharex=True, height_ratios=[3, 1])
+ax[0].plot(cur['t'], cur['pupil_px'], '.-', ms=3, lw=1)
+ax[0].set_ylabel("pupil diameter (px)")
+ax[0].set_title(f"pupil vs time, {CURVE_CLIP}  (iris locked + geometry/temporal gate)")
+ax[1].plot(cur['t'], cur['ratio'], '.-', ms=3, lw=1, color="purple")
+ax[1].set_ylabel("pupil / iris"); ax[1].set_xlabel("time (s)")
+plt.tight_layout(); plt.show()
+
+# %% [eval harness]  <-- delegable eval scaffolding (valid% + C5 reporting), NOT spine math.
+# Runs every clip through build_curve, RED vs GRAY, and reports the gate PASS RATE plus the
+# quality stats the doc's C5 asks for: frames measured, frames rejected, and the LONGEST
+# contiguous rejected run. A clip can be 70% valid overall yet have its entire pre-flash
+# baseline dropped, which makes it useless; valid% alone hides that. Onset t0 is YOUR spine,
+# so this stays t0-free and reports WHERE the longest gap sits (start-end time) instead, so a
+# baseline-clustered failure is still visible. This is the before/after metric for the fine-tune.
+EVAL_STRIDE = 9          # coarser than CURVE_STRIDE for a faster sweep; lower = more detail, slower
+EVAL_MODES  = ["gray", "red"]   # channels to compare; drop one to halve the runtime
+
+def longest_reject_run(valid, t):
+    """Longest run of consecutive INVALID (gated-out) frames -> (n_frames, t_start, t_end)."""
+    best_n, best_ts, best_te = 0, None, None
+    run, start = 0, 0
+    for i, ok in enumerate(valid):
+        if not ok:
+            if run == 0:
+                start = i
+            run += 1
+            if run > best_n:
+                best_n, best_ts, best_te = run, t[start], t[i]
+        else:
+            run = 0
+    return best_n, best_ts, best_te
+
+def clip_stats(cur):
+    v = np.asarray(cur["valid"]); t = cur["t"]
+    n, nv = len(v), int(v.sum())
+    gn, gts, gte = longest_reject_run(v, t)
+    span = f"{gts:.2f}-{gte:.2f}s" if gts is not None else "-"
+    return dict(measured=n, valid=nv, pct=100.0 * nv / max(n, 1), rejected=n - nv, gap=gn, span=span)
+
+def eval_all(stride=EVAL_STRIDE, modes=EVAL_MODES):
+    """Sweep every clip x every mode, print a valid%/reject/longest-gap table, return the curves.
+    Toggles USE_RED_CHANNEL per mode and restores it after (so the notebook state is unchanged)."""
+    global USE_RED_CHANNEL, CURVE_STRIDE
+    clips = sorted(p for p in Path(CLIPS_DIR).glob("*") if p.suffix.lower() in {".mov", ".mp4", ".avi", ".mkv"})
+    rois = _load_rois()
+    saved_red, saved_stride = USE_RED_CHANNEL, CURVE_STRIDE
+    CURVE_STRIDE = stride
+    results = {}
+    try:
+        for clip in clips:
+            c0 = cv2.VideoCapture(str(clip)); c0.set(cv2.CAP_PROP_POS_FRAMES, 0); ok, f0 = c0.read(); c0.release()
+            if not ok:
+                print(f"skip {clip.stem}: unreadable"); continue
+            seed = get_roi(clip.stem, f0, rois)
+            if seed is None:
+                print(f"skip {clip.stem}: no ROI in eye_rois.json"); continue
+            roi = framed_roi(seed, f0.shape)
+            for mode in modes:
+                USE_RED_CHANNEL = (mode == "red")
+                print(f"[{clip.stem} | {mode}]")
+                results[(clip.stem, mode)] = clip_stats(build_curve(clip, roi, seed_box=seed))
+    finally:
+        USE_RED_CHANNEL, CURVE_STRIDE = saved_red, saved_stride   # never leave the globals flipped
+
+    print(f"\n{'clip':16s} {'mode':5s} {'valid%':>7s} {'meas':>5s} {'rej':>4s} {'longest reject run':>22s}")
+    print("-" * 64)
+    for (stem, mode), s in results.items():
+        print(f"{stem:16s} {mode:5s} {s['pct']:6.1f}% {s['measured']:5d} {s['rejected']:4d}   {s['gap']:4d}f @ {s['span']}")
+    return results
+
+eval_results = eval_all()
 
 # %% [optional] inspect the raw 4-class mask for one frame (sanity-check the classes)
 # Uncomment to see what RITnet actually labels. Useful if a brown iris gets merged into pupil.
@@ -419,3 +738,47 @@ print("red dots = limbus points used; blue = fitted iris circle. Red should hug 
 # ok, frame = cap.read(); cap.release()
 # mask = segment(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
 # plt.figure(figsize=(4, 6)); plt.imshow(mask, cmap="viridis"); plt.colorbar(); plt.title("RITnet classes 0..3"); plt.show()
+
+# %% [diagnose Part 2]  see glint removal + which channel actually isolates the pupil
+# Set DIAG_CLIP to the clip you want to inspect (stem, no extension). Shows, for one frame:
+# original vs glint-removed, what glint removal changed, and the pupil_mask from V vs from S.
+DIAG_CLIP  = "IMG_4599 2"     # <-- change to your darkest-iris clip stem
+DIAG_FRAME = None             # None = middle frame, or an int index
+
+_clip = next(p for p in Path(CLIPS_DIR).glob("*") if p.stem == DIAG_CLIP)
+_rois = _load_rois()
+_cap = cv2.VideoCapture(str(_clip)); _nf = int(_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+_fi = _nf // 2 if DIAG_FRAME is None else DIAG_FRAME
+_cap.set(cv2.CAP_PROP_POS_FRAMES, _fi); _ok, _fr = _cap.read(); _cap.release()
+_fr = crop(_fr, framed_roi(get_roi(DIAG_CLIP, _fr, _rois), _fr.shape))
+diag_bgr = cv2.resize(_fr, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
+
+diag_mask = segment(ritnet_input(diag_bgr))
+diag_ic   = iris_circle(diag_mask)
+diag_in   = disk_mask(diag_ic, diag_bgr.shape[:2])
+diag_clean = remove_glint(diag_bgr)
+_hsv = cv2.cvtColor(diag_clean, cv2.COLOR_BGR2HSV)
+diag_s, diag_v = _hsv[..., 1], _hsv[..., 2]
+
+ritnet_pupil = (diag_mask == CLS_PUPIL)           # RITnet's OWN pupil class, on the framed crop
+diag_pupil = pupil_in_iris(diag_mask, diag_ic)    # the circle the pipeline now returns (from RITnet pupil)
+
+# draw the fitted iris (blue) + pupil (green) on RITnet's pupil mask, so mask and circle line up
+mask_vis = cv2.cvtColor(ritnet_pupil.astype(np.uint8) * 255, cv2.COLOR_GRAY2BGR)
+_draw_circle(mask_vis, diag_ic, (255, 0, 0))
+_draw_circle(mask_vis, diag_pupil, (0, 255, 0))
+
+print(f"iris_r={diag_ic[2]:.1f}  pupil_r={diag_pupil[2] if diag_pupil else float('nan'):.1f}"
+      f"  ratio={(diag_pupil[2]/diag_ic[2]) if diag_pupil else float('nan'):.3f}"
+      f"  RITnet pupil px={int(ritnet_pupil.sum())}")
+
+_f, _ax = plt.subplots(1, 4, figsize=(15, 6))
+_ax[0].imshow(cv2.cvtColor(diag_bgr, cv2.COLOR_BGR2RGB)); _ax[0].set_title("original crop")
+_ax[1].imshow(diag_s, cmap="gray");                       _ax[1].set_title("S (saturation), reference")
+_ax[2].imshow(ritnet_pupil, cmap="gray");                _ax[2].set_title("RITnet pupil class (raw)")
+_ax[3].imshow(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB)); _ax[3].set_title("RITnet pupil + fitted circles")
+for a in _ax:
+    a.axis("off")
+plt.tight_layout(); plt.show()
+
+# %%

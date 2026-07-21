@@ -11,6 +11,7 @@ RITnet/
 # --- local working docs (not for the public repo) ---
 CLAUDE.md
 pupillometry_plan.md
+optimizations_brainstorm.md
 
 # --- python ---
 __pycache__/
