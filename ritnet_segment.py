@@ -67,6 +67,10 @@ GATE_RATIO_MAX  = 0.75       # ...or above this
 GATE_CONCENTRIC = 0.25       # pupil center must sit within this fraction of the iris radius of the iris center
 TEMPORAL_WIN    = 7          # rolling-median window (frames) for single-frame spike rejection
 TEMPORAL_K      = 4.0        # reject a point that is > K local-MADs from its rolling median
+# Iris-lock uses LIT frames only: dark pre-flash iris fits are inflated and poison the clip-median
+# ruler (measured: clip 4569 locks +85.6% -> -5.0% once dark frames are excluded). The light-on
+# moment is a KNOWN, not learned: marked per clip now, reported by the phone's torch in the app.
+LIGHT_ONSET_FILE = Path("light_onset.json")   # {clip_stem: onset_time_seconds}; see light_onset_frame()
 
 # RITnet needs the EYE TO FILL THE FRAME (it was trained on near-eye OpenEDS images).
 # Our clips show the whole face, so we crop to an eye ROI first. The camera is static
@@ -304,12 +308,22 @@ def measure(mask, bgr):
     return dict(iris_circle=ic, iris_px=iris_px, pupil_circle=pupil, pupil_px=pupil_px, ratio=ratio,
                 limbus_xy=(xs, ys), limbus_in=limbus_in, limbus_out=limbus_out)
 
-# %% [measurement layer - PART 3: iris-lock + geometry/temporal gate]  scaffold; Angela tunes GATE_*/TEMPORAL_*
+# %% [measurement layer - PART 3: iris-lock + geometry/temporal gate]
 def lock_iris_radius(radii):
     """The iris is a fixed ruler within a clip, so its true radius is one constant. Take the
     median of the finite per-frame radii; that median is robust to the odd bad frame."""
     radii = np.asarray(radii, float)
     return float(np.nanmedian(radii)) if np.isfinite(radii).any() else np.nan
+
+def light_onset_frame(clip_stem, fps=FPS):
+    """Frame index at/after which the flashlight is ON for this clip -> those frames are LIT.
+    Read from a manual mark now (LIGHT_ONSET_FILE, onset time in seconds). IN THE APP: replace
+    this lookup with the phone's own torch-on timestamp - a KNOWN signal, so onset is never
+    inferred or learned. Returns None if unmarked (build_curve then locks from ALL frames)."""
+    if not LIGHT_ONSET_FILE.exists():
+        return None
+    onset_s = json.loads(LIGHT_ONSET_FILE.read_text()).get(clip_stem)
+    return None if onset_s is None else int(round(float(onset_s) * fps))
 
 def passes_gate(iris_center, iris_r, pupil):
     """Geometry sanity for one frame's pupil read. Reject if the pupil is not plausibly sized,
@@ -384,7 +398,10 @@ def build_curve(clip_path, roi, seed_box=None):
     cap.release()
     print(f"  {len(kept)} frames measured / {n} total" + (" (eye-tracked)" if tracking else ""))
 
-    locked_r = lock_iris_radius(iris_r)                                  # the fixed ruler for this clip
+    onset = light_onset_frame(Path(clip_path).stem)                     # KNOWN light-on (manual now, phone later)
+    lit = np.array(kept) >= onset if onset is not None else np.ones(len(kept), bool)
+    lit_radii = [r for r, L in zip(iris_r, lit) if L]                   # lock the ruler from LIT frames only
+    locked_r = lock_iris_radius(lit_radii if any(lit) else iris_r)      # fall back to all if none flagged lit
     pupil_px = np.array([2.0 * p[2] if p else np.nan for p in pupil], float)
     for j, (c, p) in enumerate(zip(iris_c, pupil)):                      # gate each frame vs the LOCKED iris
         if not passes_gate(c, locked_r, p):

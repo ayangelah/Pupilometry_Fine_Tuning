@@ -1,0 +1,221 @@
+clip,person,frame,time_s,box,orig_h,orig_w,path
+IMG_4568,A,0,0.0,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000000.png
+IMG_4568,A,95,0.792,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000095.png
+IMG_4568,A,190,1.584,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000190.png
+IMG_4568,A,285,2.376,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000285.png
+IMG_4568,A,380,3.168,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000380.png
+IMG_4568,A,475,3.96,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000475.png
+IMG_4568,A,570,4.752,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000570.png
+IMG_4568,A,665,5.544,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000665.png
+IMG_4568,A,760,6.336,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000760.png
+IMG_4568,A,855,7.128,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000855.png
+IMG_4568,A,951,7.928,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f000951.png
+IMG_4568,A,1046,8.72,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001046.png
+IMG_4568,A,1141,9.512,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001141.png
+IMG_4568,A,1236,10.304,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001236.png
+IMG_4568,A,1331,11.096,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001331.png
+IMG_4568,A,1426,11.888,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001426.png
+IMG_4568,A,1521,12.68,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001521.png
+IMG_4568,A,1616,13.472,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001616.png
+IMG_4568,A,1711,14.264,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001711.png
+IMG_4568,A,1807,15.065,564_660_496_794,3840,2160,labeling/frames/IMG_4568/IMG_4568_f001807.png
+IMG_4569,A,0,0.0,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f000000.png
+IMG_4569,A,135,1.125,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f000135.png
+IMG_4569,A,271,2.259,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f000271.png
+IMG_4569,A,406,3.385,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f000406.png
+IMG_4569,A,542,4.519,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f000542.png
+IMG_4569,A,678,5.652,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f000678.png
+IMG_4569,A,813,6.778,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f000813.png
+IMG_4569,A,949,7.912,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f000949.png
+IMG_4569,A,1085,9.045,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f001085.png
+IMG_4569,A,1220,10.171,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f001220.png
+IMG_4569,A,1356,11.305,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f001356.png
+IMG_4569,A,1491,12.43,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f001491.png
+IMG_4569,A,1627,13.564,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f001627.png
+IMG_4569,A,1763,14.698,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f001763.png
+IMG_4569,A,1898,15.823,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f001898.png
+IMG_4569,A,2034,16.957,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f002034.png
+IMG_4569,A,2170,18.091,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f002170.png
+IMG_4569,A,2305,19.216,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f002305.png
+IMG_4569,A,2441,20.35,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f002441.png
+IMG_4569,A,2577,21.484,665_58_688_1102,2172,2156,labeling/frames/IMG_4569/IMG_4569_f002577.png
+IMG_4598 2,B,0,0.0,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000000.png
+IMG_4598 2,B,36,0.3,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000036.png
+IMG_4598 2,B,73,0.609,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000073.png
+IMG_4598 2,B,109,0.909,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000109.png
+IMG_4598 2,B,146,1.217,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000146.png
+IMG_4598 2,B,183,1.526,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000183.png
+IMG_4598 2,B,219,1.826,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000219.png
+IMG_4598 2,B,256,2.134,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000256.png
+IMG_4598 2,B,293,2.443,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000293.png
+IMG_4598 2,B,329,2.743,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000329.png
+IMG_4598 2,B,366,3.051,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000366.png
+IMG_4598 2,B,402,3.351,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000402.png
+IMG_4598 2,B,439,3.66,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000439.png
+IMG_4598 2,B,476,3.968,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000476.png
+IMG_4598 2,B,512,4.269,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000512.png
+IMG_4598 2,B,549,4.577,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000549.png
+IMG_4598 2,B,586,4.885,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000586.png
+IMG_4598 2,B,622,5.186,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000622.png
+IMG_4598 2,B,659,5.494,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000659.png
+IMG_4598 2,B,696,5.802,774_1216_761_1218,3840,2160,labeling/frames/IMG_4598 2/IMG_4598_2_f000696.png
+IMG_4599 2,B,0,0.0,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000000.png
+IMG_4599 2,B,37,0.308,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000037.png
+IMG_4599 2,B,74,0.617,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000074.png
+IMG_4599 2,B,112,0.934,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000112.png
+IMG_4599 2,B,149,1.242,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000149.png
+IMG_4599 2,B,187,1.559,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000187.png
+IMG_4599 2,B,224,1.867,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000224.png
+IMG_4599 2,B,262,2.184,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000262.png
+IMG_4599 2,B,299,2.493,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000299.png
+IMG_4599 2,B,337,2.81,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000337.png
+IMG_4599 2,B,374,3.118,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000374.png
+IMG_4599 2,B,412,3.435,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000412.png
+IMG_4599 2,B,449,3.743,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000449.png
+IMG_4599 2,B,487,4.06,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000487.png
+IMG_4599 2,B,524,4.369,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000524.png
+IMG_4599 2,B,562,4.685,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000562.png
+IMG_4599 2,B,599,4.994,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000599.png
+IMG_4599 2,B,637,5.311,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000637.png
+IMG_4599 2,B,674,5.619,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000674.png
+IMG_4599 2,B,712,5.936,530_961_819_1310,3840,2160,labeling/frames/IMG_4599 2/IMG_4599_2_f000712.png
+IMG_4600 2,C,0,0.0,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000000.png
+IMG_4600 2,C,50,0.417,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000050.png
+IMG_4600 2,C,101,0.842,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000101.png
+IMG_4600 2,C,151,1.259,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000151.png
+IMG_4600 2,C,202,1.684,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000202.png
+IMG_4600 2,C,252,2.101,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000252.png
+IMG_4600 2,C,303,2.526,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000303.png
+IMG_4600 2,C,354,2.951,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000354.png
+IMG_4600 2,C,404,3.368,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000404.png
+IMG_4600 2,C,455,3.793,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000455.png
+IMG_4600 2,C,505,4.21,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000505.png
+IMG_4600 2,C,556,4.636,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000556.png
+IMG_4600 2,C,606,5.052,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000606.png
+IMG_4600 2,C,657,5.478,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000657.png
+IMG_4600 2,C,708,5.903,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000708.png
+IMG_4600 2,C,758,6.32,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000758.png
+IMG_4600 2,C,809,6.745,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000809.png
+IMG_4600 2,C,859,7.162,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000859.png
+IMG_4600 2,C,910,7.587,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000910.png
+IMG_4600 2,C,961,8.012,412_1015_935_1496,3840,2160,labeling/frames/IMG_4600 2/IMG_4600_2_f000961.png
+subject_a_4,A,0,0.0,480_1180_399_638,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000000.png
+subject_a_4,A,31,0.258,495_1180_399_638,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000031.png
+subject_a_4,A,62,0.517,522_1200_399_638,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000062.png
+subject_a_4,A,94,0.784,567_1216_399_638,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000094.png
+subject_a_4,A,125,1.042,570_1215_399_638,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000125.png
+subject_a_4,A,157,1.309,559_1226_399_638,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000157.png
+subject_a_4,A,188,1.567,551_1242_399_638,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000188.png
+subject_a_4,A,220,1.834,538_1252_399_638,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000220.png
+subject_a_4,A,251,2.093,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000251.png
+subject_a_4,A,283,2.359,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000283.png
+subject_a_4,A,314,2.618,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000314.png
+subject_a_4,A,346,2.885,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000346.png
+subject_a_4,A,377,3.143,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000377.png
+subject_a_4,A,409,3.41,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000409.png
+subject_a_4,A,440,3.668,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000440.png
+subject_a_4,A,472,3.935,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000472.png
+subject_a_4,A,503,4.193,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000503.png
+subject_a_4,A,535,4.46,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000535.png
+subject_a_4,A,566,4.719,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000566.png
+subject_a_4,A,598,4.985,450_1164_420_672,3840,2160,labeling/frames/subject_a_4/subject_a_4_f000598.png
+subject_a_5,A,0,0.0,470_1119_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000000.png
+subject_a_5,A,37,0.308,459_1134_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000037.png
+subject_a_5,A,74,0.617,460_1143_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000074.png
+subject_a_5,A,111,0.925,509_1157_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000111.png
+subject_a_5,A,148,1.234,534_1178_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000148.png
+subject_a_5,A,185,1.542,585_1194_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000185.png
+subject_a_5,A,222,1.851,634_1226_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000222.png
+subject_a_5,A,260,2.168,663_1254_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000260.png
+subject_a_5,A,297,2.476,680_1270_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000297.png
+subject_a_5,A,334,2.785,676_1283_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000334.png
+subject_a_5,A,371,3.093,704_1261_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000371.png
+subject_a_5,A,408,3.401,698_1266_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000408.png
+subject_a_5,A,445,3.71,695_1275_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000445.png
+subject_a_5,A,483,4.027,700_1284_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000483.png
+subject_a_5,A,520,4.335,709_1280_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000520.png
+subject_a_5,A,557,4.644,711_1284_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000557.png
+subject_a_5,A,594,4.952,704_1291_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000594.png
+subject_a_5,A,631,5.261,719_1293_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000631.png
+subject_a_5,A,668,5.569,728_1288_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000668.png
+subject_a_5,A,706,5.886,727_1285_420_672,3840,2160,labeling/frames/subject_a_5/subject_a_5_f000706.png
+subject_b_3,B,0,0.0,410_864_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000000.png
+subject_b_3,B,48,0.4,478_987_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000048.png
+subject_b_3,B,97,0.809,453_1120_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000097.png
+subject_b_3,B,145,1.209,457_1146_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000145.png
+subject_b_3,B,194,1.617,467_1173_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000194.png
+subject_b_3,B,242,2.018,468_1160_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000242.png
+subject_b_3,B,291,2.426,434_1097_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000291.png
+subject_b_3,B,340,2.835,426_1163_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000340.png
+subject_b_3,B,388,3.235,323_1183_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000388.png
+subject_b_3,B,437,3.643,408_1170_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000437.png
+subject_b_3,B,485,4.043,401_1110_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000485.png
+subject_b_3,B,534,4.452,340_1125_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000534.png
+subject_b_3,B,582,4.852,325_1124_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000582.png
+subject_b_3,B,631,5.261,353_1118_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000631.png
+subject_b_3,B,680,5.669,323_1117_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000680.png
+subject_b_3,B,728,6.069,295_1132_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000728.png
+subject_b_3,B,777,6.478,318_1134_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000777.png
+subject_b_3,B,825,6.878,237_1072_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000825.png
+subject_b_3,B,874,7.286,62_1020_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000874.png
+subject_b_3,B,923,7.695,91_1047_388_621,3840,2160,labeling/frames/subject_b_3/subject_b_3_f000923.png
+subject_b_4,B,0,0.0,610_1299_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000000.png
+subject_b_4,B,70,0.584,537_1290_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000070.png
+subject_b_4,B,141,1.175,541_1207_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000141.png
+subject_b_4,B,212,1.767,0_253_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000212.png
+subject_b_4,B,283,2.359,643_496_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000283.png
+subject_b_4,B,353,2.943,772_1043_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000353.png
+subject_b_4,B,424,3.535,833_1135_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000424.png
+subject_b_4,B,495,4.127,815_1111_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000495.png
+subject_b_4,B,566,4.719,792_1119_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000566.png
+subject_b_4,B,637,5.311,694_1126_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000637.png
+subject_b_4,B,707,5.894,506_1099_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000707.png
+subject_b_4,B,778,6.486,468_1197_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000778.png
+subject_b_4,B,849,7.078,791_1284_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000849.png
+subject_b_4,B,920,7.67,797_1177_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000920.png
+subject_b_4,B,991,8.262,805_1137_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f000991.png
+subject_b_4,B,1061,8.845,758_1112_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f001061.png
+subject_b_4,B,1132,9.437,720_1089_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f001132.png
+subject_b_4,B,1203,10.029,571_1102_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f001203.png
+subject_b_4,B,1274,10.621,535_1137_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f001274.png
+subject_b_4,B,1345,11.213,516_1158_388_621,3840,2160,labeling/frames/subject_b_4/subject_b_4_f001345.png
+subject_d_1,D,0,0.0,938_975_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000000.png
+subject_d_1,D,46,0.383,902_967_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000046.png
+subject_d_1,D,92,0.767,916_1021_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000092.png
+subject_d_1,D,138,1.15,961_1036_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000138.png
+subject_d_1,D,184,1.534,935_1151_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000184.png
+subject_d_1,D,231,1.926,939_1140_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000231.png
+subject_d_1,D,277,2.309,742_1244_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000277.png
+subject_d_1,D,323,2.693,635_1240_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000323.png
+subject_d_1,D,369,3.076,674_1257_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000369.png
+subject_d_1,D,415,3.46,741_1279_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000415.png
+subject_d_1,D,462,3.852,698_1316_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000462.png
+subject_d_1,D,508,4.235,780_1275_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000508.png
+subject_d_1,D,554,4.619,791_1260_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000554.png
+subject_d_1,D,600,5.002,781_1228_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000600.png
+subject_d_1,D,646,5.385,760_1237_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000646.png
+subject_d_1,D,693,5.777,738_1230_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000693.png
+subject_d_1,D,739,6.161,775_1250_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000739.png
+subject_d_1,D,785,6.544,788_1199_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000785.png
+subject_d_1,D,831,6.928,812_1197_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000831.png
+subject_d_1,D,878,7.32,840_1193_588_940,3840,2160,labeling/frames/subject_d_1/subject_d_1_f000878.png
+subject_d_2,D,0,0.0,1416_1019_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000000.png
+subject_d_2,D,59,0.492,1309_946_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000059.png
+subject_d_2,D,119,0.992,1187_908_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000119.png
+subject_d_2,D,178,1.484,1149_1014_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000178.png
+subject_d_2,D,238,1.984,1096_1176_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000238.png
+subject_d_2,D,297,2.476,1204_1275_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000297.png
+subject_d_2,D,357,2.976,1262_1265_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000357.png
+subject_d_2,D,417,3.476,1281_1271_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000417.png
+subject_d_2,D,476,3.968,1317_1227_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000476.png
+subject_d_2,D,536,4.468,1326_1209_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000536.png
+subject_d_2,D,595,4.96,1351_1227_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000595.png
+subject_d_2,D,655,5.461,1356_1221_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000655.png
+subject_d_2,D,714,5.952,1397_1239_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000714.png
+subject_d_2,D,774,6.453,1397_1234_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000774.png
+subject_d_2,D,834,6.953,1348_1239_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000834.png
+subject_d_2,D,893,7.445,1369_1207_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000893.png
+subject_d_2,D,953,7.945,1362_1188_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f000953.png
+subject_d_2,D,1012,8.437,1416_1170_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f001012.png
+subject_d_2,D,1072,8.937,1375_728_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f001072.png
+subject_d_2,D,1132,9.437,1311_785_588_940,3840,2160,labeling/frames/subject_d_2/subject_d_2_f001132.png
