@@ -44,7 +44,7 @@ h1 { font-size:26px; margin:6px 0 4px; letter-spacing:-.01em; text-wrap:balance;
   background:var(--warn-bg); }
 .banner b { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--warn); }
 .banner span { font-size:13px; color:var(--muted); }
-.tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:30px; }
+.tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:30px; }
 .tile { border:1px solid var(--hair); border-radius:10px; padding:14px 14px 12px;
   display:flex; flex-direction:column; gap:9px; }
 .tk { font-size:12px; color:var(--muted); }
@@ -113,6 +113,14 @@ h2 { font-size:16px; margin:2px 0 3px; letter-spacing:-.005em; }
   <div class="tk">Latency</div>
   <div class="tv"><span class="num">150</span><span class="tu">ms</span></div>
   <div class="tmeta"><span class="chip good">prompt</span><span class="norm">typical 230</span></div>
+</div><div class="tile">
+  <div class="tk">Peak constriction vel.</div>
+  <div class="tv"><span class="num">8.2</span><span class="tu">mm/s</span></div>
+  <div class="tmeta"><span class="chip good">brisk</span><span class="norm">typical 4.2</span></div>
+</div><div class="tile">
+  <div class="tk">Mean constriction vel.</div>
+  <div class="tv"><span class="num">2.1</span><span class="tu">mm/s</span></div>
+  <div class="tmeta"><span class="chip good">in range</span><span class="norm">typical 2.7</span></div>
 </div></div>
 
   <section>
@@ -126,9 +134,6 @@ h2 { font-size:16px; margin:2px 0 3px; letter-spacing:-.005em; }
   <text x="14" y="141.0" class="axtitle" transform="rotate(-90 14 141.0)">diameter (mm)</text>
   <text x="427" y="298" text-anchor="middle" class="axtitle">time after light onset (s)</text>
 </svg></div>
-    <div class="prov"><b>Provisional</b>
-      <span>Constriction-velocity figures (peak &amp; mean) are being finalized with noise-robust
-      differentiation; size, depth, and latency above are final.</span></div>
   </section>
 
   <section class="evidence">
