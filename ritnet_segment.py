@@ -363,7 +363,7 @@ def build_curve(clip_path, roi, seed_box=None):
     per-frame so handheld drift never pushes it out of the crop (A5); otherwise the fixed
     `roi` is used for every frame. Reads frames in order (no per-frame seek, which was the
     slow path on 4K clips) and measures every CURVE_STRIDE-th; tracking still runs every
-    frame so continuity is preserved. Returns dict(t, iris_px, pupil_px, ratio, valid)."""
+    frame so continuity is preserved. Returns dict(t, iris_px, pupil_px, ratio, valid, onset_t)."""
     cap = cv2.VideoCapture(str(clip_path))
     n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     tracker, tracking = None, (TRACK_EYE and seed_box is not None)
@@ -409,75 +409,78 @@ def build_curve(clip_path, roi, seed_box=None):
     pupil_px = reject_temporal_outliers(pupil_px)                        # kill single-frame spikes
     iris_px = np.full(len(pupil_px), 2.0 * locked_r)
     t = np.array(kept, float) / FPS
+    onset_t = onset / FPS if onset is not None else None                 # KNOWN light-on, in curve-t units (for Stage 2 windowing)
     return dict(t=t, iris_px=iris_px, pupil_px=pupil_px, ratio=pupil_px / iris_px,
-                valid=np.isfinite(pupil_px))
+                valid=np.isfinite(pupil_px), onset_t=onset_t)
 
 # %% [test] fit_circle in isolation  <-- delegable: validates YOUR circle math, no RITnet needed
 # Run after implementing fit_circle, BEFORE the full pipeline. Run cells: imports -> Part 1 -> this.
 # The key case is #3: only the left/right arcs survive (lid covers top/bottom), and a 3-DOF
 # circle still recovers the radius. That is exactly why we chose circle over ellipse.
-def _circle_points(cx, cy, r, angles, noise=0.0, seed=0):
-    rng = np.random.default_rng(seed)
-    x = cx + r * np.cos(angles) + rng.normal(0, noise, angles.shape)
-    y = cy + r * np.sin(angles) + rng.normal(0, noise, angles.shape)
-    return x, y
+if __name__ == "__main__":   # test cell: runs interactively / as a script, skipped on import
+    def _circle_points(cx, cy, r, angles, noise=0.0, seed=0):
+        rng = np.random.default_rng(seed)
+        x = cx + r * np.cos(angles) + rng.normal(0, noise, angles.shape)
+        y = cy + r * np.sin(angles) + rng.normal(0, noise, angles.shape)
+        return x, y
 
-def _check(name, cx, cy, r, x, y, tol_c, tol_r, assert_ok=True):
-    fcx, fcy, fr = fit_circle(x, y)
-    ec, er = float(np.hypot(fcx - cx, fcy - cy)), float(abs(fr - r))
-    tag = "PASS" if (ec <= tol_c and er <= tol_r) else ("FAIL" if assert_ok else "info")
-    print(f"[{tag:4s}] {name:22s} n={len(x):3d}  center_err={ec:5.2f} (tol {tol_c})  radius_err={er:5.2f} (tol {tol_r})")
-    if assert_ok:
-        assert ec <= tol_c and er <= tol_r, f"{name}: center off {ec:.2f}, radius off {er:.2f}"
+    def _check(name, cx, cy, r, x, y, tol_c, tol_r, assert_ok=True):
+        fcx, fcy, fr = fit_circle(x, y)
+        ec, er = float(np.hypot(fcx - cx, fcy - cy)), float(abs(fr - r))
+        tag = "PASS" if (ec <= tol_c and er <= tol_r) else ("FAIL" if assert_ok else "info")
+        print(f"[{tag:4s}] {name:22s} n={len(x):3d}  center_err={ec:5.2f} (tol {tol_c})  radius_err={er:5.2f} (tol {tol_r})")
+        if assert_ok:
+            assert ec <= tol_c and er <= tol_r, f"{name}: center off {ec:.2f}, radius off {er:.2f}"
 
-CX, CY, R = 200.0, 320.0, 90.0           # a plausible iris circle in 400x640 space
-ang = np.linspace(0, 2 * np.pi, 200, endpoint=False)
+    CX, CY, R = 200.0, 320.0, 90.0           # a plausible iris circle in 400x640 space
+    ang = np.linspace(0, 2 * np.pi, 200, endpoint=False)
 
-_check("full clean",  CX, CY, R, *_circle_points(CX, CY, R, ang),                 0.5, 0.5)
-_check("full + noise", CX, CY, R, *_circle_points(CX, CY, R, ang, noise=1.5),     2.0, 2.0)
+    _check("full clean",  CX, CY, R, *_circle_points(CX, CY, R, ang),                 0.5, 0.5)
+    _check("full + noise", CX, CY, R, *_circle_points(CX, CY, R, ang, noise=1.5),     2.0, 2.0)
 
-# lid occlusion: keep only side arcs (|cos| large == near-horizontal points)
-side = np.abs(np.cos(ang)) > 0.34        # ~+-70 deg arcs on left and right; tighten to test harder
-_check("side arcs (lid)", CX, CY, R, *_circle_points(CX, CY, R, ang[side], noise=1.5, seed=1), 3.0, 3.0)
+    # lid occlusion: keep only side arcs (|cos| large == near-horizontal points)
+    side = np.abs(np.cos(ang)) > 0.34        # ~+-70 deg arcs on left and right; tighten to test harder
+    _check("side arcs (lid)", CX, CY, R, *_circle_points(CX, CY, R, ang[side], noise=1.5, seed=1), 3.0, 3.0)
 
-# one side only: ill-conditioned, shown to mark the limit (no assert)
-one = np.cos(ang) > 0.5
-_check("one side (limit)", CX, CY, R, *_circle_points(CX, CY, R, ang[one], noise=1.0, seed=2), 8.0, 8.0, assert_ok=False)
+    # one side only: ill-conditioned, shown to mark the limit (no assert)
+    one = np.cos(ang) > 0.5
+    _check("one side (limit)", CX, CY, R, *_circle_points(CX, CY, R, ang[one], noise=1.0, seed=2), 8.0, 8.0, assert_ok=False)
 
-print("\nfit_circle: asserted cases passed")
+    print("\nfit_circle: asserted cases passed")
 
 # %% [test] fit_circle_robust convergence  <-- delegable: proves the iteration rejects outliers
 # Plant a known circle (side arcs, like a real lidded iris), then inject the two junk types
 # we actually see: a CENTER BLOB (reflection mislabeled as sclera) and a LID STRAND (iris label
 # smeared along the lid). The naive one-shot fit gets dragged off; the iterated robust fit should
 # recover the true circle. Run cells: imports -> Part 1 -> this.
-rng = np.random.default_rng(7)
+if __name__ == "__main__":   # test cell: runs interactively / as a script, skipped on import
+    rng = np.random.default_rng(7)
 
-# good limbus: left/right arcs of the true circle, with noise (this is the signal)
-gx, gy = _circle_points(CX, CY, R, ang[np.abs(np.cos(ang)) > 0.34], noise=1.5, seed=3)
+    # good limbus: left/right arcs of the true circle, with noise (this is the signal)
+    gx, gy = _circle_points(CX, CY, R, ang[np.abs(np.cos(ang)) > 0.34], noise=1.5, seed=3)
 
-# outlier 1: center blob (~90px inside the true circle -> should be trimmed)
-bx = CX + rng.uniform(-12, 12, 25)
-by = CY + rng.uniform(-12, 12, 25)
+    # outlier 1: center blob (~90px inside the true circle -> should be trimmed)
+    bx = CX + rng.uniform(-12, 12, 25)
+    by = CY + rng.uniform(-12, 12, 25)
 
-# outlier 2: lid strand, a short off-circle arc ~18px outside the top (-> should be trimmed)
-sx = CX + rng.uniform(-30, 30, 15)
-sy = (CY - (R + 18)) + rng.uniform(-3, 3, 15)
+    # outlier 2: lid strand, a short off-circle arc ~18px outside the top (-> should be trimmed)
+    sx = CX + rng.uniform(-30, 30, 15)
+    sy = (CY - (R + 18)) + rng.uniform(-3, 3, 15)
 
-x_all = np.concatenate([gx, bx, sx])
-y_all = np.concatenate([gy, by, sy])
+    x_all = np.concatenate([gx, bx, sx])
+    y_all = np.concatenate([gy, by, sy])
 
-ncx, ncy, nr = fit_circle(x_all, y_all)                 # naive, one shot (all points)
-rcx, rcy, rr = fit_circle_robust(x_all, y_all)          # iterated, trims outliers
-naive_err  = abs(nr - R)
-robust_c   = float(np.hypot(rcx - CX, rcy - CY))
-robust_r   = float(abs(rr - R))
-print(f"naive  fit: r={nr:5.1f}  radius_err={naive_err:5.2f}")
-print(f"robust fit: r={rr:5.1f}  center_err={robust_c:5.2f}  radius_err={robust_r:5.2f}")
+    ncx, ncy, nr = fit_circle(x_all, y_all)                 # naive, one shot (all points)
+    rcx, rcy, rr = fit_circle_robust(x_all, y_all)          # iterated, trims outliers
+    naive_err  = abs(nr - R)
+    robust_c   = float(np.hypot(rcx - CX, rcy - CY))
+    robust_r   = float(abs(rr - R))
+    print(f"naive  fit: r={nr:5.1f}  radius_err={naive_err:5.2f}")
+    print(f"robust fit: r={rr:5.1f}  center_err={robust_c:5.2f}  radius_err={robust_r:5.2f}")
 
-assert robust_c < 3.0 and robust_r < 3.0, "robust fit did not recover the true circle"
-assert robust_r < naive_err, "robust fit should beat the naive fit on the contaminated set"
-print("fit_circle_robust: converged and beat the naive fit")
+    assert robust_c < 3.0 and robust_r < 3.0, "robust fit did not recover the true circle"
+    assert robust_r < naive_err, "robust fit should beat the naive fit on the contaminated set"
+    print("fit_circle_robust: converged and beat the naive fit")
 
 # %% [overlay helper]  <-- delegable debug dump
 def _draw_circle(img, circ, color):
@@ -621,68 +624,71 @@ def preview_rois():
             ax.set_title(f"{c.stem}  -- NO ROI YET, read x,y,w,h and edit eye_rois.json", fontsize=8)
         plt.tight_layout(); plt.show()
 
-preview_rois()
-print(f"edit {ROI_FILE} (replace the [0,0,0,0] boxes), then re-run this cell to verify the red box")
+if __name__ == "__main__":   # demo cell: runs interactively / as a script, skipped on import
+    preview_rois()
+    print(f"edit {ROI_FILE} (replace the [0,0,0,0] boxes), then re-run this cell to verify the red box")
 
 # %% [run validation]  sample frames per clip, segment, measure, dump overlays
-clips = sorted(p for p in Path(CLIPS_DIR).glob("*") if p.suffix.lower() in {".mov", ".mp4", ".avi", ".mkv"})
-assert clips, f"no videos in {CLIPS_DIR}/"
-out_root = Path("debug_masks"); out_root.mkdir(exist_ok=True)
-rois = _load_rois()
-# tag overlays by the model-input mode so red-vs-gray runs persist side by side (B1 ablation)
-INPUT_TAG = ("red" if USE_RED_CHANNEL else "gray") + ("_deglint" if GLINT_PRESEG else "")
-print(f"{len(clips)} clip(s); sampling {N_SAMPLE} frames each; USE_ROI={USE_ROI}; input={INPUT_TAG}\n")
+if __name__ == "__main__":   # demo cell: runs interactively / as a script, skipped on import
+    clips = sorted(p for p in Path(CLIPS_DIR).glob("*") if p.suffix.lower() in {".mov", ".mp4", ".avi", ".mkv"})
+    assert clips, f"no videos in {CLIPS_DIR}/"
+    out_root = Path("debug_masks"); out_root.mkdir(exist_ok=True)
+    rois = _load_rois()
+    # tag overlays by the model-input mode so red-vs-gray runs persist side by side (B1 ablation)
+    INPUT_TAG = ("red" if USE_RED_CHANNEL else "gray") + ("_deglint" if GLINT_PRESEG else "")
+    print(f"{len(clips)} clip(s); sampling {N_SAMPLE} frames each; USE_ROI={USE_ROI}; input={INPUT_TAG}\n")
 
-for clip in clips:
-    cap = cv2.VideoCapture(str(clip))
-    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    idxs = np.linspace(0, max(n - 1, 0), N_SAMPLE, dtype=int)   # evenly spaced across the clip
-    sub = out_root / f"{clip.stem}__{INPUT_TAG}"; sub.mkdir(exist_ok=True)
+    for clip in clips:
+        cap = cv2.VideoCapture(str(clip))
+        n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        idxs = np.linspace(0, max(n - 1, 0), N_SAMPLE, dtype=int)   # evenly spaced across the clip
+        sub = out_root / f"{clip.stem}__{INPUT_TAG}"; sub.mkdir(exist_ok=True)
 
-    roi = None
-    if USE_ROI:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        ok0, frame0 = cap.read()
-        tight = get_roi(clip.stem, frame0, rois) if ok0 else None
-        if tight is None or tight[2] == 0 or tight[3] == 0:
-            print(f"-- skip {clip.name}: no eye ROI set. Run the preview cell and fill eye_rois.json")
-            cap.release(); continue
-        roi = framed_roi(tight, frame0.shape)   # expand tight eye box to OpenEDS framing
+        roi = None
+        if USE_ROI:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ok0, frame0 = cap.read()
+            tight = get_roi(clip.stem, frame0, rois) if ok0 else None
+            if tight is None or tight[2] == 0 or tight[3] == 0:
+                print(f"-- skip {clip.name}: no eye ROI set. Run the preview cell and fill eye_rois.json")
+                cap.release(); continue
+            roi = framed_roi(tight, frame0.shape)   # expand tight eye box to OpenEDS framing
 
-    print(f"== {clip.name} ({n} frames)  roi={roi} ==")
-    for i in idxs:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(i))
-        ok, frame = cap.read()
-        if not ok:
-            continue
-        if roi is not None:
-            frame = crop(frame, roi)
-        crop_bgr = cv2.resize(frame, (IN_W, IN_H), interpolation=cv2.INTER_AREA)  # color, aligned to mask
-        mask = segment(ritnet_input(frame))
-        m = measure(mask, crop_bgr)
-        cv2.imwrite(str(sub / f"frame_{int(i):05d}.png"), overlay(crop_bgr, m))
-        print(f"  f{int(i):5d}  iris={m['iris_px']:6.1f}px  pupil={m['pupil_px']:6.1f}px  ratio={m['ratio']:.3f}")
-    cap.release()
-print(f"\nwrote overlays to {out_root.resolve()}/<clip>/")
-print("legend: blue=iris circle, green=pupil circle, yellow dots=kept limbus, red dots=trimmed")
+        print(f"== {clip.name} ({n} frames)  roi={roi} ==")
+        for i in idxs:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(i))
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            if roi is not None:
+                frame = crop(frame, roi)
+            crop_bgr = cv2.resize(frame, (IN_W, IN_H), interpolation=cv2.INTER_AREA)  # color, aligned to mask
+            mask = segment(ritnet_input(frame))
+            m = measure(mask, crop_bgr)
+            cv2.imwrite(str(sub / f"frame_{int(i):05d}.png"), overlay(crop_bgr, m))
+            print(f"  f{int(i):5d}  iris={m['iris_px']:6.1f}px  pupil={m['pupil_px']:6.1f}px  ratio={m['ratio']:.3f}")
+        cap.release()
+    print(f"\nwrote overlays to {out_root.resolve()}/<clip>/")
+    print("legend: blue=iris circle, green=pupil circle, yellow dots=kept limbus, red dots=trimmed")
 
 # %% [run curve]  build the pupil-vs-time curve for ONE clip (iris locked + gated + spikes removed)
-CURVE_CLIP = "IMG_4599 2"     # <-- clip stem to plot
-_cl = next(p for p in Path(CLIPS_DIR).glob("*") if p.stem == CURVE_CLIP)
-_rois = _load_rois()
-_c0 = cv2.VideoCapture(str(_cl)); _c0.set(cv2.CAP_PROP_POS_FRAMES, 0); _ok0, _f0 = _c0.read(); _c0.release()
-_seed = get_roi(CURVE_CLIP, _f0, _rois)            # TIGHT eye box; seeds the per-frame tracker
-_roi = framed_roi(_seed, _f0.shape)               # fixed-box fallback if TRACK_EYE is off
-cur = build_curve(_cl, _roi, seed_box=_seed)       # eye-tracked when TRACK_EYE; sequential read (faster)
-print(f"{CURVE_CLIP}: {cur['valid'].mean() * 100:.0f}% frames valid, locked iris = {cur['iris_px'][0]:.1f}px")
+if __name__ == "__main__":   # demo cell: runs interactively / as a script, skipped on import
+    CURVE_CLIP = "subject_b_2"     # <-- clip stem to plot
+    _cl = next(p for p in Path(CLIPS_DIR).glob("*") if p.stem == CURVE_CLIP)
+    _rois = _load_rois()
+    _c0 = cv2.VideoCapture(str(_cl)); _c0.set(cv2.CAP_PROP_POS_FRAMES, 0); _ok0, _f0 = _c0.read(); _c0.release()
+    _seed = get_roi(CURVE_CLIP, _f0, _rois)            # TIGHT eye box; seeds the per-frame tracker
+    _roi = framed_roi(_seed, _f0.shape)               # fixed-box fallback if TRACK_EYE is off
+    cur = build_curve(_cl, _roi, seed_box=_seed)       # eye-tracked when TRACK_EYE; sequential read (faster)
+    print(f"{CURVE_CLIP}: {cur['valid'].mean() * 100:.0f}% frames valid, locked iris = {cur['iris_px'][0]:.1f}px")
 
-fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharex=True, height_ratios=[3, 1])
-ax[0].plot(cur['t'], cur['pupil_px'], '.-', ms=3, lw=1)
-ax[0].set_ylabel("pupil diameter (px)")
-ax[0].set_title(f"pupil vs time, {CURVE_CLIP}  (iris locked + geometry/temporal gate)")
-ax[1].plot(cur['t'], cur['ratio'], '.-', ms=3, lw=1, color="purple")
-ax[1].set_ylabel("pupil / iris"); ax[1].set_xlabel("time (s)")
-plt.tight_layout(); plt.show()
+    fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharex=True, height_ratios=[3, 1])
+    ax[0].plot(cur['t'], cur['pupil_px'], '.-', ms=3, lw=1)
+    ax[0].set_ylabel("pupil diameter (px)")
+    ax[0].set_title(f"pupil vs time, {CURVE_CLIP}  (iris locked + geometry/temporal gate)")
+    ax[1].plot(cur['t'], cur['ratio'], '.-', ms=3, lw=1, color="purple")
+    ax[1].set_ylabel("pupil / iris"); ax[1].set_xlabel("time (s)")
+    plt.tight_layout(); plt.show()
 
 # %% [eval harness]  <-- delegable eval scaffolding (valid% + C5 reporting), NOT spine math.
 # Runs every clip through build_curve, RED vs GRAY, and reports the gate PASS RATE plus the
@@ -747,7 +753,8 @@ def eval_all(stride=EVAL_STRIDE, modes=EVAL_MODES):
         print(f"{stem:16s} {mode:5s} {s['pct']:6.1f}% {s['measured']:5d} {s['rejected']:4d}   {s['gap']:4d}f @ {s['span']}")
     return results
 
-eval_results = eval_all()
+if __name__ == "__main__":   # demo cell: runs interactively / as a script, skipped on import
+    eval_results = eval_all()
 
 # %% [optional] inspect the raw 4-class mask for one frame (sanity-check the classes)
 # Uncomment to see what RITnet actually labels. Useful if a brown iris gets merged into pupil.
@@ -759,43 +766,44 @@ eval_results = eval_all()
 # %% [diagnose Part 2]  see glint removal + which channel actually isolates the pupil
 # Set DIAG_CLIP to the clip you want to inspect (stem, no extension). Shows, for one frame:
 # original vs glint-removed, what glint removal changed, and the pupil_mask from V vs from S.
-DIAG_CLIP  = "IMG_4599 2"     # <-- change to your darkest-iris clip stem
-DIAG_FRAME = None             # None = middle frame, or an int index
+if __name__ == "__main__":   # demo cell: runs interactively / as a script, skipped on import
+    DIAG_CLIP  = "subject_b_2"     # <-- change to your darkest-iris clip stem
+    DIAG_FRAME = None             # None = middle frame, or an int index
 
-_clip = next(p for p in Path(CLIPS_DIR).glob("*") if p.stem == DIAG_CLIP)
-_rois = _load_rois()
-_cap = cv2.VideoCapture(str(_clip)); _nf = int(_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-_fi = _nf // 2 if DIAG_FRAME is None else DIAG_FRAME
-_cap.set(cv2.CAP_PROP_POS_FRAMES, _fi); _ok, _fr = _cap.read(); _cap.release()
-_fr = crop(_fr, framed_roi(get_roi(DIAG_CLIP, _fr, _rois), _fr.shape))
-diag_bgr = cv2.resize(_fr, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
+    _clip = next(p for p in Path(CLIPS_DIR).glob("*") if p.stem == DIAG_CLIP)
+    _rois = _load_rois()
+    _cap = cv2.VideoCapture(str(_clip)); _nf = int(_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    _fi = _nf // 2 if DIAG_FRAME is None else DIAG_FRAME
+    _cap.set(cv2.CAP_PROP_POS_FRAMES, _fi); _ok, _fr = _cap.read(); _cap.release()
+    _fr = crop(_fr, framed_roi(get_roi(DIAG_CLIP, _fr, _rois), _fr.shape))
+    diag_bgr = cv2.resize(_fr, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
 
-diag_mask = segment(ritnet_input(diag_bgr))
-diag_ic   = iris_circle(diag_mask)
-diag_in   = disk_mask(diag_ic, diag_bgr.shape[:2])
-diag_clean = remove_glint(diag_bgr)
-_hsv = cv2.cvtColor(diag_clean, cv2.COLOR_BGR2HSV)
-diag_s, diag_v = _hsv[..., 1], _hsv[..., 2]
+    diag_mask = segment(ritnet_input(diag_bgr))
+    diag_ic   = iris_circle(diag_mask)
+    diag_in   = disk_mask(diag_ic, diag_bgr.shape[:2])
+    diag_clean = remove_glint(diag_bgr)
+    _hsv = cv2.cvtColor(diag_clean, cv2.COLOR_BGR2HSV)
+    diag_s, diag_v = _hsv[..., 1], _hsv[..., 2]
 
-ritnet_pupil = (diag_mask == CLS_PUPIL)           # RITnet's OWN pupil class, on the framed crop
-diag_pupil = pupil_in_iris(diag_mask, diag_ic)    # the circle the pipeline now returns (from RITnet pupil)
+    ritnet_pupil = (diag_mask == CLS_PUPIL)           # RITnet's OWN pupil class, on the framed crop
+    diag_pupil = pupil_in_iris(diag_mask, diag_ic)    # the circle the pipeline now returns (from RITnet pupil)
 
-# draw the fitted iris (blue) + pupil (green) on RITnet's pupil mask, so mask and circle line up
-mask_vis = cv2.cvtColor(ritnet_pupil.astype(np.uint8) * 255, cv2.COLOR_GRAY2BGR)
-_draw_circle(mask_vis, diag_ic, (255, 0, 0))
-_draw_circle(mask_vis, diag_pupil, (0, 255, 0))
+    # draw the fitted iris (blue) + pupil (green) on RITnet's pupil mask, so mask and circle line up
+    mask_vis = cv2.cvtColor(ritnet_pupil.astype(np.uint8) * 255, cv2.COLOR_GRAY2BGR)
+    _draw_circle(mask_vis, diag_ic, (255, 0, 0))
+    _draw_circle(mask_vis, diag_pupil, (0, 255, 0))
 
-print(f"iris_r={diag_ic[2]:.1f}  pupil_r={diag_pupil[2] if diag_pupil else float('nan'):.1f}"
-      f"  ratio={(diag_pupil[2]/diag_ic[2]) if diag_pupil else float('nan'):.3f}"
-      f"  RITnet pupil px={int(ritnet_pupil.sum())}")
+    print(f"iris_r={diag_ic[2]:.1f}  pupil_r={diag_pupil[2] if diag_pupil else float('nan'):.1f}"
+          f"  ratio={(diag_pupil[2]/diag_ic[2]) if diag_pupil else float('nan'):.3f}"
+          f"  RITnet pupil px={int(ritnet_pupil.sum())}")
 
-_f, _ax = plt.subplots(1, 4, figsize=(15, 6))
-_ax[0].imshow(cv2.cvtColor(diag_bgr, cv2.COLOR_BGR2RGB)); _ax[0].set_title("original crop")
-_ax[1].imshow(diag_s, cmap="gray");                       _ax[1].set_title("S (saturation), reference")
-_ax[2].imshow(ritnet_pupil, cmap="gray");                _ax[2].set_title("RITnet pupil class (raw)")
-_ax[3].imshow(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB)); _ax[3].set_title("RITnet pupil + fitted circles")
-for a in _ax:
-    a.axis("off")
-plt.tight_layout(); plt.show()
+    _f, _ax = plt.subplots(1, 4, figsize=(15, 6))
+    _ax[0].imshow(cv2.cvtColor(diag_bgr, cv2.COLOR_BGR2RGB)); _ax[0].set_title("original crop")
+    _ax[1].imshow(diag_s, cmap="gray");                       _ax[1].set_title("S (saturation), reference")
+    _ax[2].imshow(ritnet_pupil, cmap="gray");                _ax[2].set_title("RITnet pupil class (raw)")
+    _ax[3].imshow(cv2.cvtColor(mask_vis, cv2.COLOR_BGR2RGB)); _ax[3].set_title("RITnet pupil + fitted circles")
+    for a in _ax:
+        a.axis("off")
+    plt.tight_layout(); plt.show()
 
 # %%
