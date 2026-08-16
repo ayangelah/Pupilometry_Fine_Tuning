@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.ndimage import median_filter
+from scipy.signal import savgol_filter
 
 # %% [config]
 # 1c calibration constant. The iris is a per-frame ruler: its diameter is
@@ -107,19 +109,38 @@ def latency(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float, baseline_mm: fl
     return np.nan
 
 
+def smooth_diameter(y: np.ndarray, window: int = 5) -> np.ndarray:
+    """Median-filter a 1-D diameter signal so single-frame outliers don't blow up its
+    derivative. NaN-safe: linearly interpolates short gated gaps onto the valid samples
+    before filtering, so the phase stays contiguous. `window` (forced odd) trades noise
+    rejection against flattening the true peak, so start small. Median, not mean/savgol,
+    because it rejects a lone spike outright instead of being dragged toward it."""
+    y = np.asarray(y, float)
+    good = np.isfinite(y)
+    if good.sum() < 3:
+        return y.copy()
+    k = window if window % 2 else window + 1          # odd kernel
+    idx = np.arange(y.size)
+    filled = np.interp(idx, idx[good], y[good])        # bridge gaps so the filter is continuous
+    return median_filter(filled, size=k, mode="nearest")   # 'nearest' holds edges (no zero-pull slope)
+
+
 def constriction_velocity(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float) -> tuple[float, float]:
     """Constriction velocities in mm/s over the constriction phase (onset -> min).
     Returns (peak, mean) of the negative slope magnitude. dt from np.diff(t) (stride-aware).
     Light smoothing before differentiating helps; slopes amplify per-frame noise."""
     constriction_mask = t >= onset_t
     t_phase     = t[constriction_mask]        # build the phase from the mask
-    pupil_phase = pupil_mm[constriction_mask]
-    imin = np.nanargmin(pupil_phase)          # then cut it at the minimum
-    t_phase     = t_phase[:imin + 1]
-    pupil_phase = pupil_phase[:imin + 1]
-    vel = np.diff(pupil_phase) / np.diff(t_phase)   # one copy only
-    peak = -np.nanmin(vel)
-    mean = -np.nanmean(vel)
+    pupil_phase = smooth_diameter(pupil_mm[constriction_mask], window=5)
+    floor = np.nanmin(pupil_phase)
+    tol = 0.05 * (pupil_phase[0] - floor)
+    iend  = np.argmax(pupil_phase <= floor + tol)
+    t_phase     = t_phase[:iend + 1]
+    pupil_phase = pupil_phase[:iend + 1]
+    dt = np.median(np.diff(t_phase))
+    vel = -savgol_filter(pupil_phase, window_length=11, polyorder=2, deriv=1, delta=dt)
+    peak = np.nanmax(vel)
+    mean = np.nanmean(vel)
     return (peak, mean)
 
 
