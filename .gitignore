@@ -1,3 +1,8 @@
+# --- licensed datasets (MOBIUS/SBVPI, Univ. Ljubljana): non-commercial research licence,
+# GDPR Art. 9 biometric data. They live OUTSIDE the repo (../datasets/); this is a backstop
+# against an accidental copy-in + add. NEVER commit these. ---
+datasets/
+
 # --- data & generated outputs (privacy: real faces/eyes; also large) ---
 data/
 debug_frames/
@@ -20,6 +25,7 @@ RITnet/
 CLAUDE.md
 pupillometry_plan.md
 optimizations_brainstorm.md
+mobius-sbvpi-handoff.md
 
 # --- python ---
 __pycache__/
