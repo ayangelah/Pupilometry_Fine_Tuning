@@ -14,6 +14,7 @@ light_onset.json
 # labeled eye crops + full-face ROI previews + label JSONs (privacy). GT geometry is kept
 # as the non-sensitive labeling/*.csv (coords only, no images).
 labeling/frames/
+labeling/label_session/
 labeling/gt/
 labeling/roi_previews/
 # fine-tune model checkpoints (derived artifacts, large)
