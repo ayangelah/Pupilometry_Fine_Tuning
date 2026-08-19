@@ -251,23 +251,13 @@ def remove_glint(bgr):
     return cv2.inpaint(bgr, glint, 3, cv2.INPAINT_TELEA)
 
 def pupil_in_iris(mask, iris):
-    """Color crop (BGR, IN_H x IN_W) + iris circle (cx, cy, r) -> pupil circle (cx, cy, r) or None.
-    steps:
-      1. inside = disk_mask(iris, bgr.shape[:2])     # only look within the iris        [helper above]
-      2. clean  = remove_glint(bgr)                  # kill specular spots first        [helper above]
-      3. Pick a channel where the pupil pops from the iris. Convert `clean` to HSV (or Lab) and
-         choose one channel. Try saturation S and value V; keep whichever splits best on the
-         dark-iris clip (the 'desaturated-dark pupil vs colored-dark iris' idea).
-      4. LOCAL Otsu on ONLY the iris pixels of that channel (not the whole image):
-             thr, _ = cv2.threshold(channel[inside], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-             pupil_mask = inside & (channel < thr)   # pupil = the low side; flip '<' if needed
-         (cv2.threshold runs Otsu on whatever array you hand it, so channel[inside] computes the
-          threshold from the iris histogram alone. Then you apply it to the full channel yourself.)
-      5. Central blob: connected components on pupil_mask; keep the blob containing / nearest the
-         iris center (cx, cy). Same tool as iris_limbus_points.
-      6. Fit: the pupil is fully visible (not lid-occluded), so fit directly. Reuse fit_circle on
-         the blob boundary, or cv2.minEnclosingCircle. Return (cx, cy, r), or None if none found.
-    """
+    """4-class mask + iris circle (cx, cy, r) -> pupil circle (cx, cy, r) or None.
+    Uses RITnet's OWN pupil class (class 3): take the class-3 blob nearest the iris centre
+    (MORPH_CLOSE'd to smooth raggedness), then fit a circle to its RIM via fit_circle_robust
+    (not centroid+area, which drifts off-centre on ragged blobs). Glint inpainting is kept
+    upstream. (A colour-Otsu-inside-the-iris approach was tried first and abandoned: once the
+    OpenEDS framing was fixed, no channel cleanly separated a brown iris from a black pupil and
+    RITnet's pupil class became usable - see CLAUDE.md, Stage 1b.)"""
     pupil_mask = (mask == CLS_PUPIL)    # RITnet's pupil pixels
     pupil_mask = cv2.morphologyEx(pupil_mask.astype(np.uint8),
                                   cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)).astype(bool)  # smooth raggedness
