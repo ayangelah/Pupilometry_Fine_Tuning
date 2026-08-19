@@ -29,9 +29,10 @@ measuring iris and pupil in the *same* frame cancels camera distance, zoom, and 
 pupil_mm = (pupil_px / iris_px) * IRIS_MM        # IRIS_MM ≈ 11.7
 ```
 
-The 11.7 mm constant is a stated source of error — but note the headline clinical metric,
-**percent constriction `(baseline − min) / baseline`, is independent of it entirely** (the
-constant cancels). The absolute-mm assumption never touches the number that matters most.
+The 11.7 mm constant is a stated source of error for the *absolute-size* metrics (resting
+diameter, minimum). Conveniently, though, the headline reflex metric — **percent constriction
+`(baseline − min) / baseline`** — is a *ratio*, so the constant cancels top-and-bottom: the
+number we emphasize most is immune to our least-certain input.
 
 ---
 
