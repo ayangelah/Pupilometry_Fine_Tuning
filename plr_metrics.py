@@ -37,6 +37,10 @@ BASELINE_END_MS  = 150.0   # end the window before constriction can begin (< ~18
 MIN_VALID_FRAC      = 0.40   # below this gate pass-rate the whole curve is too sparse to trust
 MIN_BASELINE_FRAMES = 3      # baseline-dependent metrics (%constriction, latency) need at least
                              # this many valid frames in the snap-baseline window (else no denominator)
+# Curve-shape sanity (a real reflex constricts, and does not dilate, after onset):
+MIN_CONSTRICTION_PCT    = 10.0   # a clip constricting less than this shows no usable reflex
+MAX_POST_ONSET_DILATION = 0.05   # smoothed pupil rising >5% above baseline after onset = anomaly
+                                 # (mismarked onset / non-reflex / gaze corruption, e.g. subject_c_1)
 
 
 # %% [1c calibration] one calibration line
@@ -83,16 +87,35 @@ def assess_validity(curve: dict) -> dict:
       clip_ok      - enough of the curve passed the geometry gate to trust anything at all
       baseline_ok  - the snap-baseline window holds enough valid frames for a denominator
     A clip can be clip_ok but NOT baseline_ok (dead baseline, e.g. subject_b_1): size and
-    velocity may still hold while %constriction and latency do not. Policy (what to do on a
-    failed verdict) is decided by the caller."""
+    velocity may still hold while %constriction and latency do not.
+
+    constriction_ok - curve-SHAPE check: after onset the pupil should constrict (net decrease)
+    and not dilate. Catches mismarked onset / weak-or-absent reflex / gaze-corrupted curves
+    (e.g. subject_c_1) that the per-frame gate passes. Ratio-based, so it never touches per-frame
+    fit position (the noise that sank the naive gaze filter). None if there is no baseline to
+    compare against. Policy (what to do on a failed verdict) is decided by the caller."""
     t = np.asarray(curve["t"], float)
     valid = np.asarray(curve.get("valid", np.isfinite(curve.get("ratio", t))), bool)
     onset_t = curve.get("onset_t")
     valid_frac = float(valid.mean()) if valid.size else 0.0
     n_baseline = 0 if onset_t is None else int((baseline_window_mask(t, float(onset_t)) & valid).sum())
+
+    constriction_ok, depth_pct, dilation = None, None, None
+    if onset_t is not None and n_baseline >= MIN_BASELINE_FRAMES:
+        ratio = np.asarray(curve["ratio"], float)                       # scale-invariant; IRIS_MM cancels
+        base = np.nanmedian(ratio[baseline_window_mask(t, float(onset_t))])
+        after_ramp = t >= float(onset_t) + BASELINE_SKIP_MS / 1000.0     # skip the AE-ramp inflation
+        sm = smooth_diameter(ratio[after_ramp])                         # smoothed post-onset curve
+        if np.isfinite(base) and base > 0 and np.isfinite(sm).any():
+            depth_pct = float((base - np.nanmin(sm)) / base * 100.0)    # how deep it constricted
+            dilation  = float(np.nanmax(sm) / base - 1.0)               # peak rise ABOVE baseline
+            constriction_ok = (depth_pct >= MIN_CONSTRICTION_PCT) and (dilation <= MAX_POST_ONSET_DILATION)
+
     return dict(valid_frac=valid_frac, n_baseline=n_baseline,
                 clip_ok=valid_frac >= MIN_VALID_FRAC,
-                baseline_ok=n_baseline >= MIN_BASELINE_FRAMES)
+                baseline_ok=n_baseline >= MIN_BASELINE_FRAMES,
+                constriction_ok=constriction_ok,
+                constriction_depth_pct=depth_pct, post_onset_dilation=dilation)
 
 
 def baseline_diameter(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float) -> float:
