@@ -19,6 +19,14 @@ subject). Run from the repo root.
 Steps 2 and 5 are idempotent: `detect_rois` skips clips already in `new_subject_rois.json`,
 `extract_frames` skips sequences already in `manifest.csv`. Safe to re-run as subjects arrive.
 
+**Manual boxing (`box_eyes.py`) — the reliable alternative to steps 2-4.** `detect_rois` (Haar)
+assumes both eyes are visible and stumbles on single-eye / angled clips. `box_eyes.py` is an
+interactive click-drag tool (VS Code `# %%` cells, needs `pip install ipympl`): for each clip you
+drag a box around **each visible eye** — one for a single-eye/angled clip, two for full-face — and
+it writes them straight to `new_subject_rois.json`. This handles the 1-eye AND 2-eye cases
+explicitly, and mirrors the deployed alignment overlay (you place the box the nurse aligns to).
+Use it instead of `detect_rois` when footage is mixed, or to fix any box the contact sheet flags.
+
 ## Fixing a bad ROI (step 4)
 
 The contact sheet is the QC. Any cell not centred on an eye is wrong. Edit
