@@ -24,37 +24,45 @@ FRAMES = REPO / "labeling" / "frames"
 MANIFEST = REPO / "labeling" / "manifest.csv"
 
 
-def already_extracted():
-    if not MANIFEST.exists(): return set()
-    return {r["clip"] for r in csv.DictReader(open(MANIFEST))}
+def extracted_frames():
+    """clip -> set of frame indices already in the manifest (so densify never re-extracts them)."""
+    import collections
+    m = collections.defaultdict(set)
+    if MANIFEST.exists():
+        for r in csv.DictReader(open(MANIFEST)):
+            m[r["clip"]].add(int(r["frame"]))
+    return m
 
 
 def main():
     N = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+    GAP = 15                                                     # skip a sample within this many frames of one already extracted
     rois = json.load(open(ROIS))
-    done = already_extracted()
+    have = extracted_frames()
     rows = []
     for seq_id, box in sorted(rois.items()):
-        if seq_id in done:
-            print(f"{seq_id}: already extracted, skip"); continue
+        existing = set(have.get(seq_id, set()))                 # frames already extracted (preserve them)
         stem = seq_id.rsplit("_", 1)[0]
         person = seq_id.split("_")[1].upper()                    # E / F / ...  (LOSO fold)
         clip = next(p for p in (REPO / "data" / "clips").glob("*") if p.stem == stem)
         cap = cv2.VideoCapture(str(clip)); n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = cap.get(cv2.CAP_PROP_FPS) or 120.0
         outdir = FRAMES / seq_id; outdir.mkdir(parents=True, exist_ok=True)
-        kept = 0
+        kept, had = 0, len(existing)
         for fi in np.linspace(0.08 * n, 0.92 * n, N, dtype=int):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, int(fi)); ok, fr = cap.read()
+            fi = int(fi)
+            if any(abs(fi - e) < GAP for e in existing):        # already have a near-identical frame
+                continue
+            cap.set(cv2.CAP_PROP_POS_FRAMES, fi); ok, fr = cap.read()
             if not ok: continue
             eye = cv2.resize(crop(fr, framed_roi(tuple(box), fr.shape)), (IN_W, IN_H),
                              interpolation=cv2.INTER_AREA)
-            name = f"{seq_id}_f{int(fi):06d}.png"
-            cv2.imwrite(str(outdir / name), eye); kept += 1
-            rows.append([seq_id, person, int(fi), round(fi / fps, 3), "_".join(map(str, box)),
+            name = f"{seq_id}_f{fi:06d}.png"
+            cv2.imwrite(str(outdir / name), eye); existing.add(fi); kept += 1
+            rows.append([seq_id, person, fi, round(fi / fps, 3), "_".join(map(str, box)),
                          fr.shape[0], fr.shape[1], f"labeling/frames/{seq_id}/{name}"])
         cap.release()
-        print(f"{seq_id} (person {person}): {kept} frames", flush=True)
+        print(f"{seq_id} (person {person}): +{kept} frames (had {had})", flush=True)
 
     if not rows:
         print("\nnothing new to extract."); return
