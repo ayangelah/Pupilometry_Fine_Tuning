@@ -26,7 +26,7 @@ load_ritnet, WEIGHTS, disk_mask, passes_gate = _ns["load_ritnet"], _ns["WEIGHTS"
 IGNORE = 255
 
 # %% [config]  <-- Angela tunes the training hyperparameters
-SUBJECTS   = ["A", "B", "C", "D"]     # LOSO folds: each is held out as the test subject once
+SUBJECTS   = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]     # LOSO folds: each is held out as the test subject once
 BATCH      = 4
 EPOCHS     = 5
 CKPT_DIR   = "checkpoints"; os.makedirs(CKPT_DIR, exist_ok=True)
@@ -113,6 +113,17 @@ def set_trainable(model, train_substrings=None):
         p.requires_grad = any(s in name for s in train_substrings)
     return model
 
+def freeze_bn(model):
+    """Put BatchNorm layers in eval mode so their running mean/var stay FROZEN during training
+    (requires_grad=False does NOT stop BN stats updating in train() mode - they drift the whole
+    net toward the fine-tune data). Gradients still flow to trainable params; only BN stats are
+    held to their pretrained values. Re-apply at the START of each epoch, because eval_subject()
+    flips the model to eval() and back to train(), which re-enables BN's stat updates."""
+    for m in model.modules():
+        if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+            m.eval()
+    return model
+
 def save_ckpt(model, held_out, tag="best"):
     path = os.path.join(CKPT_DIR, f"ritnet_ft_holdout_{held_out}_{tag}.pkl")
     torch.save(model.state_dict(), path); return path
@@ -135,11 +146,12 @@ def eval_subject(model, held_out, recs, use_red=True):
         with torch.no_grad():
             m = measure(segment(ritnet_input(bgr)), bgr)
         s = 0.5 * (IN_W / w + IN_H / h)
-        P["iris_n"] += 1
-        if m["iris_circle"] is not None:
-            P["iris_det"] += 1
-            gd = np.zeros((h, w), np.uint8); cv2.circle(gd, (round(float(g["iris_cx"])), round(float(g["iris_cy"]))), round(float(g["iris_r"])), 1, -1)
-            P["iris_iou"].append(_iou(cv2.resize(gd, (IN_W, IN_H), interpolation=cv2.INTER_NEAREST).astype(bool), disk_mask(m["iris_circle"], (IN_H, IN_W))))
+        if g["iris_cx"] != "":                                        # skip frames with no GT iris (e.g. pupil drawn, iris missed)
+            P["iris_n"] += 1
+            if m["iris_circle"] is not None:
+                P["iris_det"] += 1
+                gd = np.zeros((h, w), np.uint8); cv2.circle(gd, (round(float(g["iris_cx"])), round(float(g["iris_cy"]))), round(float(g["iris_r"])), 1, -1)
+                P["iris_iou"].append(_iou(cv2.resize(gd, (IN_W, IN_H), interpolation=cv2.INTER_NEAREST).astype(bool), disk_mask(m["iris_circle"], (IN_H, IN_W))))
         if g["category"] == "full":
             P["pup_n"] += 1
             gated = m["iris_circle"] is not None and passes_gate(m["iris_circle"][:2], m["iris_circle"][2], m["pupil_circle"])
@@ -177,8 +189,9 @@ def train_fold(held_out, recs):
         [p for p in model.parameters() if p.requires_grad],
         lr=1e-5, weight_decay=1e-3
     )                                        # LR / weight decay
-    model.train()
     for epoch in range(EPOCHS): # each epoch
+        model.train()
+        freeze_bn(model)
         total_loss = 0
         for x, y in loader: # each batch
             x, y = x.to(DEVICE), y.to(DEVICE)
@@ -198,5 +211,21 @@ print("BEFORE:", eval_subject(base, HELD_OUT, recs))
 ft = train_fold(HELD_OUT, recs)               # <- your loop
 print("AFTER :", eval_subject(ft, HELD_OUT, recs))
 save_ckpt(ft, HELD_OUT)
+
+# %% [run LOSO: hold out every subject once]  <-- the full sweep (a few min per fold)
+recs = load_records()
+loso = {}
+for held_out in SUBJECTS:
+    print(f"\n===== hold out {held_out} =====", flush=True)
+    before = eval_subject(load_model(), held_out, recs)          # base model on the unseen subject
+    ft = train_fold(held_out, recs)                              # fine-tune on the other 10
+    after = eval_subject(ft, held_out, recs)                     # fine-tuned model on the unseen subject
+    save_ckpt(ft, held_out)
+    loso[held_out] = (before, after)
+    print(f"[{held_out}] BEFORE {before}  ->  AFTER {after}")
+
+print("\n===== LOSO summary (before -> after per held-out subject) =====")
+for s, (b, a) in loso.items():
+    print(f"{s}:  before {b}\n     after  {a}")
 
 # %%
