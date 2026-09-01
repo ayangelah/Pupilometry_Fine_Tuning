@@ -183,11 +183,11 @@ def train_fold(held_out, recs):
     #         loss = criterion(logits, y); loss.backward(); optimizer.step(); optimizer.zero_grad()
     #     # track eval_subject(model, held_out, recs) on the held-out set; checkpoint the best
     # return model
-    set_trainable(model, train_substrings=["out_conv"])          # choose what to fine-tune
+    set_trainable(model, train_substrings=["out_conv", "up_block4"])          # choose what to fine-tune
     criterion = torch.nn.CrossEntropyLoss(ignore_index=IGNORE, weight=torch.tensor([1, 1, 1, 6], dtype=torch.float).to(DEVICE)) # bg, sclera, iris, pupil
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad],
-        lr=1e-5, weight_decay=1e-3
+        lr=1e-4, weight_decay=1e-4
     )                                        # LR / weight decay
     for epoch in range(EPOCHS): # each epoch
         model.train()
