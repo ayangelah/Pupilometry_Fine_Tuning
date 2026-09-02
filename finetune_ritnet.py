@@ -12,7 +12,7 @@
 # "disk is all iris, no pupil" (suppresses false pupils in the dark).
 
 # %% [imports + load ritnet_segment defs (config, preprocess, model, eval helpers)]
-import os, csv, math
+import os, csv, math, copy
 os.environ.setdefault("MPLBACKEND", "Agg")
 import numpy as np, cv2, torch
 from torch.utils.data import Dataset, DataLoader
@@ -61,6 +61,14 @@ def fold_split(held_out, recs):
     train = [r for r in recs if r["person"] != held_out]
     test  = [r for r in recs if r["person"] == held_out]
     return train, test
+
+def pick_val(held_out, subjects=None):
+    """Validation-subject strategy for best-epoch selection (ROTATION): the subject AFTER the
+    held-out test subject in SUBJECTS (wrapping). Deterministic, disjoint from the test subject,
+    so selecting an epoch on it does NOT leak into the held-out score. <- Angela owns this policy."""
+    subjects = subjects or SUBJECTS
+    i = subjects.index(held_out)
+    return subjects[(i + 1) % len(subjects)]
 
 # %% [dataset]  <-- plumbing: frame -> RITnet input tensor; GT -> ANCHORED 4-class target
 class IrisPupilDataset(Dataset):
@@ -166,9 +174,9 @@ def eval_subject(model, held_out, recs, use_red=True):
                 pup_det=P["pup_det"] / max(P["pup_n"], 1), pup_iou=f(P["pup_iou"]), pup_de=f(P["pup_de"]))
 
 # %% [train one fold]
-def train_fold(held_out, recs):
-    train_recs, _ = fold_split(held_out, recs)
-    train_recs = [r for r in train_recs if r["category"] == "full"]   # pupil-visible frames only
+def train_fold(held_out, recs, val_subj=None):
+    exclude = {held_out} | ({val_subj} if val_subj else set())        # val subj is disjoint from train+test
+    train_recs = [r for r in recs if r["person"] not in exclude and r["category"] == "full"]  # pupil-visible only
     loader = DataLoader(IrisPupilDataset(train_recs), batch_size=BATCH, shuffle=True)
     model = load_model()
 
@@ -189,6 +197,7 @@ def train_fold(held_out, recs):
         [p for p in model.parameters() if p.requires_grad],
         lr=1e-4, weight_decay=1e-4
     )                                        # LR / weight decay
+    best = {"score": -1.0, "epoch": -1, "state": None}     # best-epoch snapshot (plumbing)
     for epoch in range(EPOCHS): # each epoch
         model.train()
         freeze_bn(model)
@@ -198,17 +207,29 @@ def train_fold(held_out, recs):
             logits = model(x)                              # (B, 4, IN_H, IN_W)
             loss = criterion(logits, y); loss.backward(); optimizer.step(); optimizer.zero_grad()
             total_loss += loss.item()
-        print(f"epoch {epoch}: avg loss {total_loss/len(loader)}")
-        # track eval_subject(model, held_out, recs) on the held-out set; checkpoint the best, need a validation subject, only do if overfit
-        print(f"eval subject: {eval_subject(model, held_out, recs)}")
+        # validate on the VAL subject (disjoint from held_out -> no leak into the reported score)
+        v = eval_subject(model, val_subj, recs) if val_subj else None
+        print(f"epoch {epoch}: avg loss {total_loss/len(loader):.4f}" + (f"  val[{val_subj}] {v}" if v else ""))
+        if v is not None:
+            score = v["pup_det"]                           # <-- Angela: SELECTION CRITERION (what to maximize)
+            if score > best["score"]:
+                best = {"score": score, "epoch": epoch, "state": copy.deepcopy(model.state_dict())}
+    if best["state"] is not None:                          # <-- Angela: restore best-on-val epoch (vs keep last)
+        model.load_state_dict(best["state"])
+        print(f"  -> restored best epoch {best['epoch']} (val pup_det {best['score']:.3f})")
     return model
+
+# Best-epoch selection (val_subj=pick_val(...)) is PARKED: at n=11 a single val subject is too
+# noisy a selector - it matched fixed-5-epoch where it picked the last epoch and hurt fold D where
+# it picked ep0 (mean Δ +0.020 vs +0.023 fixed). Pass val_subj to re-enable once a POOLED multi-
+# subject val set makes the signal less noisy. Default (None) reproduces the best config.
 
 # %% [run one fold: before vs after]  <-- Angela drives; prints the delta the fine-tune bought
 HELD_OUT = "A"
 recs = load_records()
 base = load_model()
 print("BEFORE:", eval_subject(base, HELD_OUT, recs))
-ft = train_fold(HELD_OUT, recs)               # <- your loop
+ft = train_fold(HELD_OUT, recs)               # <- your loop  (add val_subj=pick_val(HELD_OUT) for best-epoch)
 print("AFTER :", eval_subject(ft, HELD_OUT, recs))
 save_ckpt(ft, HELD_OUT)
 
@@ -218,7 +239,7 @@ loso = {}
 for held_out in SUBJECTS:
     print(f"\n===== hold out {held_out} =====", flush=True)
     before = eval_subject(load_model(), held_out, recs)          # base model on the unseen subject
-    ft = train_fold(held_out, recs)                              # fine-tune on the other 10
+    ft = train_fold(held_out, recs)                              # fine-tune on the other 10 (val_subj=pick_val(held_out) to select best-epoch)
     after = eval_subject(ft, held_out, recs)                     # fine-tuned model on the unseen subject
     save_ckpt(ft, held_out)
     loso[held_out] = (before, after)
