@@ -12,7 +12,7 @@ This mirrors the deployed alignment overlay: you place the box the nurse's overl
 to, and the 1-vs-2-eye count is whatever you draw.
 """
 # %% [setup]  <-- run once
-# %matplotlib widget          # <-- UNCOMMENT this line in VS Code (removes the leading '# '); enables click-drag
+%matplotlib widget          # <-- UNCOMMENT this line in VS Code (removes the leading '# '); enables click-drag
 import json, re
 from pathlib import Path
 import cv2
