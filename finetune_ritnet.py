@@ -43,18 +43,48 @@ def _cull():
     except FileNotFoundError:
         return set()
 
+def _edge_clipped(frac=0.01):
+    """Frame filenames whose eyebox touches a frame edge, within `frac` of the frame size.
+    The eye is cut off there, so the iris arc is incomplete and NO circle can be fitted to it -
+    which makes iris_iou / pup_de on those frames score noise regardless of the prediction.
+    They are still valid TRAINING data (the labels are right for the visible sliver), so only
+    eval_subject drops them.
+
+    PER-FRAME, not per-sequence: each frame in frames_v2 was cropped with the box drawn on THAT
+    frame (manifest_v2's 'box' column), and a handheld clip drifts, so one frame can hug the edge
+    while the rest of its sequence is clear. Box and frame size both come from manifest_v2.csv,
+    so this costs no video I/O. Fraction, not pixels, so 4K and 720p are judged the same way."""
+    out = set()
+    try:
+        rows = list(csv.DictReader(open("labeling/manifest_v2.csv")))
+    except FileNotFoundError:
+        return out
+    for r in rows:
+        x, y, w, h = map(int, r["box"].split("_"))
+        H, W = int(r["orig_h"]), int(r["orig_w"])
+        mx, my = frac * W, frac * H
+        if x <= mx or y <= my or x + w >= W - mx or y + h >= H - my:
+            out.add(os.path.basename(r["path"]))
+    return out
+
+
 def load_records():
-    """One record per usable labeled frame: dict(person, clip, frame, category, frame_path, mask_path).
-    Excludes reject frames and edge-clipped (CLIP) frames. iris_only frames are KEPT (they supervise
-    'no pupil in the dark')."""
-    cull, recs = _cull(), []
+    """One record per usable labeled frame: dict(person, seq_id, frame, category, frame_path,
+    mask_path, edge_clip). Excludes reject frames and quality.csv CLIP frames. iris_only frames
+    are KEPT (they supervise 'no pupil in the dark'). edge_clip marks frames whose eyebox is cut
+    off by the frame boundary: kept for training, dropped by eval_subject."""
+    cull, edge, recs = _cull(), _edge_clipped(), []
     for r in csv.DictReader(open("labeling/gt.csv")):
         if r["category"] == "reject" or r["frame"] in cull:
             continue
         stem = r["frame"][:-4]
-        recs.append(dict(person=r["person"], clip=r["clip"], frame=r["frame"], category=r["category"],
-                         frame_path=f"labeling/frames/{r['clip']}/{r['frame']}",
-                         mask_path=f"labeling/gt/{r['clip']}/{stem}_mask.png"))
+        recs.append(dict(person=r["person"], seq_id=r["seq_id"], frame=r["frame"], category=r["category"],
+                         frame_path=f"labeling/frames_v2/{r['seq_id']}/{r['frame']}",
+                         mask_path=f"labeling/gt/{r['seq_id']}/{stem}_mask.png",
+                         edge_clip=r["frame"] in edge))
+    n_edge = sum(r["edge_clip"] for r in recs)
+    print(f"{len(recs)} labeled frames | {n_edge} edge-clipped: "
+          f"trained on, excluded from eval", flush=True)
     return recs
 
 def fold_split(held_out, recs):
@@ -142,7 +172,9 @@ def eval_subject(model, held_out, recs, use_red=True):
     Uses the SAME recipe as eval_labeled: iris over all non-reject, pupil over 'full' frames only."""
     _ns["model"], _ns["USE_RED_CHANNEL"] = model, use_red          # segment() reads these module globals
     prev = model.training; model.eval()
-    test = [r for r in recs if r["person"] == held_out]
+    # edge-clipped frames are excluded here only: their GT circle is un-fittable, so scoring a
+    # circle fit against it measures noise. They remain in train_fold's training set.
+    test = [r for r in recs if r["person"] == held_out and not r.get("edge_clip")]
     def _iou(a, b):
         if a is None or b is None: return None
         u = np.logical_or(a, b).sum(); return float(np.logical_and(a, b).sum()) / u if u else 0.0

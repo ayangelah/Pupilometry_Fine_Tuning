@@ -33,6 +33,12 @@ IRIS_MM = 11.7
 BASELINE_SKIP_MS = 30.0    # skip the first frames after onset (AE ramp / blink / saturation)
 BASELINE_END_MS  = 150.0   # end the window before constriction can begin (< ~180ms latency)
 
+# Same latency fact, used as a floor instead of a ceiling: the pupil cannot have finished
+# constricting before the reflex has even started, so a "minimum" found inside this window is
+# an artefact of a sparse/noisy curve, not the constriction floor. Bounds the phase-end search
+# in constriction_velocity.
+MIN_LATENCY_MS = 180.0
+
 # Clip-level validity gate thresholds (tune these; they are the knobs).
 MIN_VALID_FRAC      = 0.40   # below this gate pass-rate the whole curve is too sparse to trust
 MIN_BASELINE_FRAMES = 3      # baseline-dependent metrics (%constriction, latency) need at least
@@ -175,16 +181,36 @@ def constriction_velocity(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float) -
     """Constriction velocities in mm/s over the constriction phase (onset -> min).
     Returns (peak, mean) of the negative slope magnitude. dt from np.diff(t) (stride-aware).
     Light smoothing before differentiating helps; slopes amplify per-frame noise."""
+    WIN = 11                                  # savgol window; the phase must be at least this long
     constriction_mask = t >= onset_t
     t_phase     = t[constriction_mask]        # build the phase from the mask
+    # count REAL survivors before smoothing: smooth_diameter interpolates its gaps, so a count
+    # taken after it would always pass and the guard would be decorative.
+    if np.isfinite(pupil_mm[constriction_mask]).sum() < WIN:
+        return (np.nan, np.nan)
     pupil_phase = smooth_diameter(pupil_mm[constriction_mask], window=5)
-    floor = np.nanmin(pupil_phase)
+
+    # The floor is searched only AFTER the latency window: constriction cannot have bottomed
+    # out before it has started, so an earlier "minimum" is curve noise. Without this the first
+    # post-onset sample can BE the minimum, which makes tol 0, ends the phase at index 0, and
+    # leaves np.diff(t_phase) empty -> dt NaN -> savgol raises on a NaN delta.
+    searchable = t_phase >= onset_t + MIN_LATENCY_MS / 1000.0
+    if searchable.sum() < 2:
+        return (np.nan, np.nan)
+    floor = np.nanmin(pupil_phase[searchable])
     tol = 0.05 * (pupil_phase[0] - floor)
-    iend  = np.argmax(pupil_phase <= floor + tol)
+    reached = (pupil_phase <= floor + tol) & searchable        # first reach, latency-guarded
+    if not reached.any():
+        return (np.nan, np.nan)
+    iend = int(np.argmax(reached))
+    if iend + 1 < WIN:                        # phase shorter than the derivative window
+        return (np.nan, np.nan)
     t_phase     = t_phase[:iend + 1]
     pupil_phase = pupil_phase[:iend + 1]
     dt = np.median(np.diff(t_phase))
-    vel = -savgol_filter(pupil_phase, window_length=11, polyorder=2, deriv=1, delta=dt)
+    if not np.isfinite(dt) or dt <= 0:
+        return (np.nan, np.nan)
+    vel = -savgol_filter(pupil_phase, window_length=WIN, polyorder=2, deriv=1, delta=dt)
     peak = np.nanmax(vel)
     mean = np.nanmean(vel)
     return (peak, mean)

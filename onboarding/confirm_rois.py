@@ -21,11 +21,23 @@ def main():
     rois = json.load(open(ROIS))
     byclip = collections.defaultdict(dict)
     for k, box in rois.items():
-        stem, side = k.rsplit("_", 1); byclip[stem][side] = box
+        # Strip eye label (left_eye, right_eye) to get clip stem
+        if k.endswith("_left_eye"):
+            stem, side = k[:-9], "L"  # remove "_left_eye"
+        elif k.endswith("_right_eye"):
+            stem, side = k[:-10], "R"  # remove "_right_eye"
+        else:
+            # Fallback for old-style _L, _R naming
+            stem, side = k.rsplit("_", 1)
+        byclip[stem][side] = box
 
     cells = []
     for stem in sorted(byclip):
-        clip = next(p for p in (REPO / "data" / "clips").glob("*") if p.stem == stem)
+        try:
+            clip = next(p for p in (REPO / "data" / "clips").glob("*") if p.stem == stem)
+        except StopIteration:
+            print(f"Warning: clip {stem} not found, skipping")
+            continue
         c = cv2.VideoCapture(str(clip)); n = int(c.get(cv2.CAP_PROP_FRAME_COUNT))
         c.set(cv2.CAP_PROP_POS_FRAMES, int(0.35 * n)); ok, fr = c.read(); c.release()
         if not ok: continue

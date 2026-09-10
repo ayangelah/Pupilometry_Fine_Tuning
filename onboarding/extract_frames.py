@@ -42,9 +42,19 @@ def main():
     rows = []
     for seq_id, box in sorted(rois.items()):
         existing = set(have.get(seq_id, set()))                 # frames already extracted (preserve them)
-        stem = seq_id.rsplit("_", 1)[0]
+        # Extract clip stem from seq_id (strip _left_eye or _right_eye suffix)
+        if seq_id.endswith("_left_eye"):
+            stem = seq_id[:-9]
+        elif seq_id.endswith("_right_eye"):
+            stem = seq_id[:-10]
+        else:
+            stem = seq_id.rsplit("_", 1)[0]  # fallback for old naming
         person = seq_id.split("_")[1].upper()                    # E / F / ...  (LOSO fold)
-        clip = next(p for p in (REPO / "data" / "clips").glob("*") if p.stem == stem)
+        try:
+            clip = next(p for p in (REPO / "data" / "clips").glob("*") if p.stem == stem)
+        except StopIteration:
+            print(f"Warning: clip {stem} not found, skipping {seq_id}")
+            continue
         cap = cv2.VideoCapture(str(clip)); n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = cap.get(cv2.CAP_PROP_FPS) or 120.0
         outdir = FRAMES / seq_id; outdir.mkdir(parents=True, exist_ok=True)
