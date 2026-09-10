@@ -1,0 +1,28 @@
+{
+  "version": "6.3.1",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "iris",
+      "points": [
+        [
+          193.33333333333334,
+          292.38095238095235
+        ],
+        [
+          252.38095238095238,
+          304.76190476190476
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    }
+  ],
+  "imagePath": "subject_h_1_right_eye_f00.png",
+  "imageData": null,
+  "imageHeight": 640,
+  "imageWidth": 400
+}

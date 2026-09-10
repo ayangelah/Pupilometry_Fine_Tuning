@@ -1,0 +1,46 @@
+{
+  "version": "6.3.1",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "pupil",
+      "points": [
+        [
+          165.71428571428567,
+          308.57142857142856
+        ],
+        [
+          181.90476190476187,
+          309.5238095238095
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    },
+    {
+      "label": "iris",
+      "points": [
+        [
+          170.47619047619042,
+          309.5238095238095
+        ],
+        [
+          214.28571428571428,
+          328.57142857142856
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    }
+  ],
+  "imagePath": "subject_e_1_right_eye_f02.png",
+  "imageData": null,
+  "imageHeight": 640,
+  "imageWidth": 400
+}

@@ -11,12 +11,12 @@ debug_masks/
 eye_rois.json
 new_subject_rois.json
 light_onset.json
-# labeled eye crops + full-face ROI previews + label JSONs (privacy). GT geometry is kept
-# as the non-sensitive labeling/*.csv (coords only, no images).
+# Eye crops and full-face frames: real faces/eyes (privacy), and large (~690MB). The hand-drawn
+# label JSONs sitting beside them ARE tracked: coordinates only, no embedded imageData, and they
+# are the source labelme_to_gt.py rebuilds labeling/gt.csv from. Images stay out, labels go in.
 labeling/frames/
-labeling/frames_v2/
-# full-resolution frames used for the hand-drawn eyebox pass: whole faces, and large
-labeling/eyebox_review/
+labeling/frames_v2/**/*.png
+labeling/eyebox_review/**/*.png
 labeling/label_session/
 labeling/gt/
 labeling/roi_previews/

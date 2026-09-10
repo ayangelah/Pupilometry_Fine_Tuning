@@ -1,0 +1,28 @@
+{
+  "version": "6.3.1",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "iris",
+      "points": [
+        [
+          188.5714285714285,
+          310.4761904761905
+        ],
+        [
+          246.66666666666669,
+          347.6190476190476
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    }
+  ],
+  "imagePath": "subject_a_5_right_eye_full.png",
+  "imageData": null,
+  "imageHeight": 640,
+  "imageWidth": 400
+}

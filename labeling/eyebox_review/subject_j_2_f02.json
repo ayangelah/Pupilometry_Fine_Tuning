@@ -1,0 +1,28 @@
+{
+  "version": "6.3.1",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "eyebox",
+      "points": [
+        [
+          415.294117647059,
+          1161.1764705882354
+        ],
+        [
+          1391.7647058823532,
+          1667.058823529412
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "rectangle",
+      "flags": {},
+      "mask": null
+    }
+  ],
+  "imagePath": "subject_j_2_f02.png",
+  "imageData": null,
+  "imageHeight": 3840,
+  "imageWidth": 2160
+}

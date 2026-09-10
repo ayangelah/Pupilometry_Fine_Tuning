@@ -1,0 +1,28 @@
+{
+  "version": "6.3.1",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "iris",
+      "points": [
+        [
+          198.0952380952381,
+          305.7142857142857
+        ],
+        [
+          249.5238095238095,
+          305.7142857142857
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "circle",
+      "flags": {},
+      "mask": null
+    }
+  ],
+  "imagePath": "subject_j_4_left_eye_f00.png",
+  "imageData": null,
+  "imageHeight": 640,
+  "imageWidth": 400
+}

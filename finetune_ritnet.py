@@ -36,13 +36,7 @@ CKPT_DIR   = "checkpoints"; os.makedirs(CKPT_DIR, exist_ok=True)
 # early-stopping criterion. These live in train_fold() below, left as hooks.
 # ----------------------------------------------------------------------------
 
-# %% [LOSO fold records]  <-- plumbing: build (frame, mask, category) lists per subject, cull applied
-def _cull():
-    try:
-        return {r["frame"] for r in csv.DictReader(open("labeling/quality.csv")) if r["flag"] == "CLIP"}
-    except FileNotFoundError:
-        return set()
-
+# %% [LOSO fold records]  <-- plumbing: build (frame, mask, category) lists per subject
 def _edge_clipped(frac=0.01):
     """Frame filenames whose eyebox touches a frame edge, within `frac` of the frame size.
     The eye is cut off there, so the iris arc is incomplete and NO circle can be fitted to it -
@@ -70,12 +64,12 @@ def _edge_clipped(frac=0.01):
 
 def load_records():
     """One record per usable labeled frame: dict(person, seq_id, frame, category, frame_path,
-    mask_path, edge_clip). Excludes reject frames and quality.csv CLIP frames. iris_only frames
-    are KEPT (they supervise 'no pupil in the dark'). edge_clip marks frames whose eyebox is cut
-    off by the frame boundary: kept for training, dropped by eval_subject."""
-    cull, edge, recs = _cull(), _edge_clipped(), []
+    mask_path, edge_clip). Excludes reject frames. iris_only frames are KEPT (they supervise
+    'no pupil in the dark'). edge_clip marks frames whose eyebox is cut off by the frame
+    boundary: kept for training, dropped by eval_subject."""
+    edge, recs = _edge_clipped(), []
     for r in csv.DictReader(open("labeling/gt.csv")):
-        if r["category"] == "reject" or r["frame"] in cull:
+        if r["category"] == "reject":
             continue
         stem = r["frame"][:-4]
         recs.append(dict(person=r["person"], seq_id=r["seq_id"], frame=r["frame"], category=r["category"],
