@@ -10,6 +10,7 @@ import Photos
 import AVFoundation
 import Vision
 import CoreHaptics
+import PhotosUI
 
 struct ContentView: View {
     @State private var recordings: [Recording] = []
@@ -140,6 +141,7 @@ class CustomCameraViewController: UIViewController {
     private var cameraOutput: AVCaptureMovieFileOutput?
     private var torchIsOn = false
     private var hapticEngine: CHHapticEngine?
+    private var eyeMode: Int = 1  // 1 for single eye, 2 for both eyes
     var dismissHandler: (() -> Void)?
     
     private let topBar: UIView = {
@@ -220,6 +222,7 @@ class CustomCameraViewController: UIViewController {
         setupRecordButton()
         setupDismissButton()
         setupInstructionLabel()
+        setupModeButton()
     }
     
     private func setupInstructionLabel() {
@@ -323,10 +326,38 @@ class CustomCameraViewController: UIViewController {
     private func setupCaptureSession() {
         captureSession = AVCaptureSession()
         guard let captureSession = captureSession else { return }
-        
+
         captureSession.beginConfiguration()
         guard let videoDevice = AVCaptureDevice.default(for: .video) else { return }
-        
+
+        // Configure device for high-speed 1080p@120fps and lock exposure/white-balance
+        do {
+            try videoDevice.lockForConfiguration()
+
+            // Find and set 1080p @ 120fps high-speed format
+            if let format = videoDevice.formats.first(where: { format in
+                let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                let frameRates = format.videoSupportedFrameRateRanges
+                return dims.width == 1920 && dims.height == 1080 && frameRates.contains(where: { $0.maxFrameRate >= 120 })
+            }) {
+                videoDevice.activeFormat = format
+                videoDevice.activeVideoMinFrameDuration = CMTimeMake(value: 1, timescale: 120)
+                videoDevice.activeVideoMaxFrameDuration = CMTimeMake(value: 1, timescale: 120)
+                print("✓ Set 1080p @ 120fps high-speed format")
+            } else {
+                print("⚠ 1080p @ 120fps format not available, using default")
+            }
+
+            // Lock exposure and white balance for stable baseline
+            videoDevice.exposureMode = .locked
+            videoDevice.whiteBalanceMode = .locked
+            print("✓ Locked exposure and white balance")
+
+            videoDevice.unlockForConfiguration()
+        } catch {
+            print("Error configuring video device: \(error)")
+        }
+
         do {
             let videoInput = try AVCaptureDeviceInput(device: videoDevice)
             if captureSession.canAddInput(videoInput) {
@@ -373,7 +404,27 @@ class CustomCameraViewController: UIViewController {
         ])
         recordButton.addTarget(self, action: #selector(toggleRecording), for: .touchUpInside)
     }
-    
+
+    private func setupModeButton() {
+        let modeButton = UIButton(type: .system)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium, scale: .medium)
+        modeButton.setImage(UIImage(systemName: "eye.fill", withConfiguration: symbolConfig), for: .normal)
+        modeButton.tintColor = .systemBlue
+        modeButton.translatesAutoresizingMaskIntoConstraints = false
+        topBar.addSubview(modeButton)
+        NSLayoutConstraint.activate([
+            modeButton.trailingAnchor.constraint(equalTo: topBar.trailingAnchor, constant: -20),
+            modeButton.centerYAnchor.constraint(equalTo: topBar.centerYAnchor)
+        ])
+        modeButton.addTarget(self, action: #selector(toggleEyeMode), for: .touchUpInside)
+    }
+
+    @objc private func toggleEyeMode() {
+        eyeMode = eyeMode == 1 ? 2 : 1
+        drawBoundingBox()
+        print("Eye mode: \(eyeMode) eye\(eyeMode == 2 ? "s" : "")")
+    }
+
     @objc private func toggleTorch() {
         guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
         do {
@@ -428,27 +479,39 @@ class CustomCameraViewController: UIViewController {
     
     private func drawBoundingBox() {
         boundingBoxLayer?.removeFromSuperlayer()
-        
-        // Define the size of the bounding box
-        let boxWidth: CGFloat = 200 // Example width
-        let boxHeight: CGFloat = 200 // Example height
-        
-        // Calculate the starting point for the bounding box to be centered
-        let startX = (view.bounds.width - boxWidth) / 2
-        let startY = (view.bounds.height - boxHeight) / 2
-        
-        // Create the bounding box rectangle
-        let boundingBoxRect = CGRect(x: startX, y: startY, width: boxWidth, height: boxHeight)
-        
-        // Create and configure the shape layer for the bounding box
+
+        let boxWidth: CGFloat = 200
+        let boxHeight: CGFloat = 200
+        let centerY = (view.bounds.height - boxHeight) / 2
+
+        if eyeMode == 1 {
+            // Single eye: centered
+            let startX = (view.bounds.width - boxWidth) / 2
+            let rect = CGRect(x: startX, y: centerY, width: boxWidth, height: boxHeight)
+            drawRectangle(at: rect)
+        } else {
+            // Two eyes: side by side with gap
+            let gap: CGFloat = 20
+            let totalWidth = boxWidth * 2 + gap
+            let startX = (view.bounds.width - totalWidth) / 2
+
+            // Left eye
+            let leftRect = CGRect(x: startX, y: centerY, width: boxWidth, height: boxHeight)
+            drawRectangle(at: leftRect)
+
+            // Right eye
+            let rightRect = CGRect(x: startX + boxWidth + gap, y: centerY, width: boxWidth, height: boxHeight)
+            drawRectangle(at: rightRect)
+        }
+    }
+
+    private func drawRectangle(at rect: CGRect) {
         let shapeLayer = CAShapeLayer()
-        shapeLayer.frame = boundingBoxRect
+        shapeLayer.frame = rect
         shapeLayer.borderColor = UIColor.red.cgColor
         shapeLayer.borderWidth = 2
-        shapeLayer.cornerRadius = 10 // Optional, for rounded corners
+        shapeLayer.cornerRadius = 10
         view.layer.addSublayer(shapeLayer)
-        
-        // Keep a reference to remove it later
         boundingBoxLayer = shapeLayer
     }
     
@@ -457,7 +520,25 @@ class CustomCameraViewController: UIViewController {
         stopHapticEngine() // Ensure the haptic engine is stopped before the view disappears
         captureSession?.stopRunning()
     }
-    
+
+    private func saveVideoToPhotoLibrary(_ videoURL: URL) {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized else {
+                print("Photo library permission denied")
+                return
+            }
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
+            } completionHandler: { success, error in
+                if success {
+                    print("Video saved to camera roll")
+                } else if let error = error {
+                    print("Error saving video to camera roll: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
 }
 
 extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
@@ -466,8 +547,11 @@ extension CustomCameraViewController: AVCaptureFileOutputRecordingDelegate {
             print("Error recording video: \(error!.localizedDescription)")
             return
         }
-        
-        // Assume extractFrames is a method that extracts first and last frames
+
+        // Save to camera roll
+        saveVideoToPhotoLibrary(outputFileURL)
+
+        // Extract frames and create recording
         extractFrames(from: outputFileURL) { firstFrame, lastFrame in
             let initialDiameter = Double.random(in: 4.00...6.00).rounded(toPlaces: 2)
             let finalDiameter = Double.random(in: 2.75...4.00).rounded(toPlaces: 2)
