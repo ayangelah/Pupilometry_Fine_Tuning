@@ -1,12 +1,7 @@
 # %% [markdown]
 # Phase 2: fine-tune RITnet to fix PUPIL RECALL on dim/brown eyes (the isolated failure).
 #
-# SPINE (Angela writes by hand): the training loop - loss, optimizer, LR, which layers to
-#   fine-tune, epochs, early stopping - and the interpretation of the before/after eval.
-# DELEGABLE (this file, below): LOSO data loaders, GT->target construction, model load/freeze
-#   boilerplate, checkpoint I/O, and the before/after eval wired through the labeled harness.
-#
-# TARGET DESIGN (agreed): supervise ONLY inside the iris disk - pupil pixels -> pupil, the rest
+# TARGET DESIGN: supervise ONLY inside the iris disk - pupil pixels -> pupil, the rest
 # of the iris -> iris, everything outside the iris -> IGNORE (no loss). This targets exactly the
 # pupil-vs-iris split, leaves sclera/background untouched, and on dark iris_only frames teaches
 # "disk is all iris, no pupil" (suppresses false pupils in the dark).
@@ -25,18 +20,15 @@ preprocess, ritnet_input, segment, measure = _ns["preprocess"], _ns["ritnet_inpu
 load_ritnet, WEIGHTS, disk_mask, passes_gate = _ns["load_ritnet"], _ns["WEIGHTS"], _ns["disk_mask"], _ns["passes_gate"]
 IGNORE = 255
 
-# %% [config]  <-- Angela tunes the training hyperparameters
+# %% [config]  <-- training hyperparameters
 SUBJECTS   = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]     # LOSO folds: each is held out as the test subject once
 BATCH      = 4
 EPOCHS     = 5
 CKPT_DIR   = "checkpoints"; os.makedirs(CKPT_DIR, exist_ok=True)
-# --- TODO(Angela), the meat -------------------------------------------------
-# LR, EPOCHS, WEIGHT_DECAY, which layers to freeze, loss + class weights (pupil is a MINORITY
-# class inside the disk, so plain CE will under-weight it - consider weighting/dice/focal),
-# early-stopping criterion. These live in train_fold() below, left as hooks.
-# ----------------------------------------------------------------------------
+# LR, weight decay, trainable layers, and class weights are set in train_fold() below. Pupil is a
+# MINORITY class inside the disk, so plain CE would under-weight it; it gets extra loss weight.
 
-# %% [LOSO fold records]  <-- plumbing: build (frame, mask, category) lists per subject
+# %% [LOSO fold records]  <-- build (frame, mask, category) lists per subject
 def _edge_clipped(frac=0.01):
     """Frame filenames whose eyebox touches a frame edge, within `frac` of the frame size.
     The eye is cut off there, so the iris arc is incomplete and NO circle can be fitted to it -
@@ -89,15 +81,15 @@ def fold_split(held_out, recs):
 def pick_val(held_out, subjects=None):
     """Validation-subject strategy for best-epoch selection (ROTATION): the subject AFTER the
     held-out test subject in SUBJECTS (wrapping). Deterministic, disjoint from the test subject,
-    so selecting an epoch on it does NOT leak into the held-out score. <- Angela owns this policy."""
+    so selecting an epoch on it does NOT leak into the held-out score."""
     subjects = subjects or SUBJECTS
     i = subjects.index(held_out)
     return subjects[(i + 1) % len(subjects)]
 
-# %% [dataset]  <-- plumbing: frame -> RITnet input tensor; GT -> ANCHORED 4-class target
+# %% [dataset]  <-- frame -> RITnet input tensor; GT -> ANCHORED 4-class target
 class IrisPupilDataset(Dataset):
     """Target construction (fixed): OUTSIDE the iris disk, keep the BASE model's own prediction
-    (bg/sclera/outer-iris) as a pseudo-label; INSIDE the disk, use your hand-drawn GT (iris ring
+    (bg/sclera/outer-iris) as a pseudo-label; INSIDE the disk, use the hand-drawn GT (iris ring
     vs pupil). This anchors everything outside the disk so fine-tuning cannot collapse to
     'predict iris everywhere' (which is what ignoring the outside let it do). The base predictions
     are precomputed once at construction (the base net is fixed)."""
@@ -118,8 +110,8 @@ class IrisPupilDataset(Dataset):
         """(IN_H,IN_W) long target = base prediction, with the iris disk overwritten by GT."""
         gt = cv2.resize(gt_native, (IN_W, IN_H), interpolation=cv2.INTER_NEAREST)
         t = base_pred.copy()                                       # OUTSIDE disk: keep base bg/sclera/iris
-        t[gt == CLS_IRIS]  = CLS_IRIS                              # INSIDE disk: your GT iris ring
-        t[gt == CLS_PUPIL] = CLS_PUPIL                             # ...and your GT pupil
+        t[gt == CLS_IRIS]  = CLS_IRIS                              # INSIDE disk: GT iris ring
+        t[gt == CLS_PUPIL] = CLS_PUPIL                             # ...and GT pupil
         return torch.from_numpy(t).long()
 
     def __getitem__(self, i):
@@ -160,7 +152,7 @@ def save_ckpt(model, held_out, tag="best"):
     path = os.path.join(CKPT_DIR, f"ritnet_ft_holdout_{held_out}_{tag}.pkl")
     torch.save(model.state_dict(), path); return path
 
-# %% [before/after eval]  <-- plumbing: labeled accuracy on ONE subject, with a given model
+# %% [before/after eval]  <-- labeled accuracy on ONE subject, with a given model
 def eval_subject(model, held_out, recs, use_red=True):
     """Run `model` over held-out subject's frames -> pupil/iris detection + IoU + diameter error.
     Uses the SAME recipe as eval_labeled: iris over all non-reject, pupil over 'full' frames only."""
@@ -206,24 +198,13 @@ def train_fold(held_out, recs, val_subj=None):
     loader = DataLoader(IrisPupilDataset(train_recs), batch_size=BATCH, shuffle=True)
     model = load_model()
 
-    # ---- TODO: the training loop (the meat) --------------------------
-    # set_trainable(model, train_substrings=[...])          # choose what to fine-tune
-    # criterion = ... (CrossEntropyLoss(ignore_index=IGNORE, weight=...); pupil is minority)
-    # optimizer = ...                                        # LR / weight decay
-    # for epoch in range(EPOCHS):
-    #     for x, y in loader:
-    #         x, y = x.to(DEVICE), y.to(DEVICE)
-    #         logits = model(x)                              # (B, 4, IN_H, IN_W)
-    #         loss = criterion(logits, y); loss.backward(); optimizer.step(); optimizer.zero_grad()
-    #     # track eval_subject(model, held_out, recs) on the held-out set; checkpoint the best
-    # return model
     set_trainable(model, train_substrings=["out_conv", "up_block4"])          # choose what to fine-tune
     criterion = torch.nn.CrossEntropyLoss(ignore_index=IGNORE, weight=torch.tensor([1, 1, 1, 6], dtype=torch.float).to(DEVICE)) # bg, sclera, iris, pupil
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad],
         lr=1e-4, weight_decay=1e-4
     )                                        # LR / weight decay
-    best = {"score": -1.0, "epoch": -1, "state": None}     # best-epoch snapshot (plumbing)
+    best = {"score": -1.0, "epoch": -1, "state": None}     # best-epoch snapshot
     for epoch in range(EPOCHS): # each epoch
         model.train()
         freeze_bn(model)
@@ -237,10 +218,10 @@ def train_fold(held_out, recs, val_subj=None):
         v = eval_subject(model, val_subj, recs) if val_subj else None
         print(f"epoch {epoch}: avg loss {total_loss/len(loader):.4f}" + (f"  val[{val_subj}] {v}" if v else ""))
         if v is not None:
-            score = v["pup_det"]                           # <-- Angela: SELECTION CRITERION (what to maximize)
+            score = v["pup_det"]                           # selection criterion (what to maximize)
             if score > best["score"]:
                 best = {"score": score, "epoch": epoch, "state": copy.deepcopy(model.state_dict())}
-    if best["state"] is not None:                          # <-- Angela: restore best-on-val epoch (vs keep last)
+    if best["state"] is not None:                          # restore the best-on-val epoch (vs keep last)
         model.load_state_dict(best["state"])
         print(f"  -> restored best epoch {best['epoch']} (val pup_det {best['score']:.3f})")
     return model
@@ -250,12 +231,12 @@ def train_fold(held_out, recs, val_subj=None):
 # it picked ep0 (mean Δ +0.020 vs +0.023 fixed). Pass val_subj to re-enable once a POOLED multi-
 # subject val set makes the signal less noisy. Default (None) reproduces the best config.
 
-# %% [run one fold: before vs after]  <-- Angela drives; prints the delta the fine-tune bought
+# %% [run one fold: before vs after]  <-- prints the delta the fine-tune bought
 HELD_OUT = "A"
 recs = load_records()
 base = load_model()
 print("BEFORE:", eval_subject(base, HELD_OUT, recs))
-ft = train_fold(HELD_OUT, recs)               # <- your loop  (add val_subj=pick_val(HELD_OUT) for best-epoch)
+ft = train_fold(HELD_OUT, recs)               # add val_subj=pick_val(HELD_OUT) for best-epoch
 print("AFTER :", eval_subject(ft, HELD_OUT, recs))
 save_ckpt(ft, HELD_OUT)
 

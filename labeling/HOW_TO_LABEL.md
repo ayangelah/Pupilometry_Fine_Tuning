@@ -35,4 +35,4 @@ labelme labeling/frames --labels pupil,iris,sclera,reject --nodata --autosave
 
 - You are labeling the **reframed eye crop the model sees**, so your masks line up with predictions with no coordinate guesswork.
 - Subject grouping for the LOSO split is in `labeling/manifest.csv` (person A/B/C per clip). Do not move frames between clips.
-- When you have a few done, tell me and I will run the converter (Labelme JSON -> class masks + derived diameters) against your real output and wire up the IoU eval.
+- Once a few are done, run the converter (Labelme JSON -> class masks + derived diameters) on them and check the output before labeling the rest.

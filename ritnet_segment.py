@@ -2,14 +2,6 @@
 # Phase 1b: run RITnet on the real close-up clips and VALIDATE the pupil+iris masks.
 # RITnet = small pretrained 4-class eye-segmentation U-Net (bg / sclera / iris / pupil).
 #
-# SPINE:
-#   - the detector CHOICE (RITnet) and, later, its fine-tune train/eval
-#   - the diameter DEFINITION: diameter = mean of the two fitted-ellipse axes
-#     (kept identical to the classical baseline so the two detectors are comparable)
-#   - mm calibration + PLR metrics live downstream, NOT in this file
-# DELEGABLE (this file): RITnet load/inference boilerplate, the exact RITnet
-#   preprocessing, mask->contour->ellipse plumbing, overlay/debug dump.
-#
 # This file ONLY produces masks, pixel diameters, and overlays to look at.
 # It does not calibrate to mm and does not compute any PLR metric.
 
@@ -60,7 +52,7 @@ GLINT_PRESEG = False
 # capture / curve
 FPS             = 120.0      # clip frame rate (iPhone). Used for the time axis of the curve.
 
-# Part 3: iris-lock + geometry/temporal quality gate (Angela tunes these thresholds)
+# Part 3: iris-lock + geometry/temporal quality gate thresholds
 CURVE_STRIDE    = 3          # build the curve from every Nth frame (120fps -> 40fps at 3); speed vs resolution
 GATE_RATIO_MIN  = 0.15       # pupil/iris ratio below this is implausible -> reject that frame
 GATE_RATIO_MAX  = 0.75       # ...or above this
@@ -91,7 +83,7 @@ CLS_PUPIL  = 3
 CLS_IRIS   = 2                # iris RING only; full iris disk = iris ring + pupil
 CLS_SCLERA = 1               # the white of the eye; its border with iris is the true limbus
 
-# %% [load model]  <-- delegable boilerplate
+# %% [load model]
 def load_ritnet(weights, device):
     model = DenseNet2D(dropout=True, prob=0.2)   # must match models.py instantiation
     # weights_only=True refuses to execute arbitrary pickle code; a pure state_dict still loads.
@@ -106,7 +98,7 @@ def load_ritnet(weights, device):
 model = load_ritnet(WEIGHTS, DEVICE)
 print(f"RITnet loaded on {DEVICE}, params={sum(p.numel() for p in model.parameters()):,}")
 
-# %% [preprocess]  <-- delegable: RITnet's EXACT test-time pipeline
+# %% [preprocess]  <-- RITnet's EXACT test-time pipeline
 # gamma 0.8 LUT -> CLAHE(1.5, 8x8) -> normalize to [-1, 1]. Input must be grayscale.
 _GAMMA_LUT = (255.0 * (np.linspace(0, 1, 256) ** 0.8)).astype(np.uint8)
 _CLAHE = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
@@ -120,7 +112,7 @@ def preprocess(gray):
     t = (t - 0.5) / 0.5                               # [-1,1], matches Normalize([0.5],[0.5])
     return t.unsqueeze(0).unsqueeze(0)                # add batch + channel dims
 
-# %% [model input]  <-- delegable: choose the single channel RITnet sees (B1/B3)
+# %% [model input]  <-- choose the single channel RITnet sees (B1/B3)
 def _inpaint_glint_1ch(chan):
     """Near-saturated pixels are specular glint; dilate + inpaint BEFORE gamma/CLAHE
     so CLAHE cannot amplify the blowout into the mask (B3). Single-channel analogue of
@@ -141,7 +133,7 @@ def ritnet_input(bgr):
         chan = _inpaint_glint_1ch(chan)
     return np.ascontiguousarray(chan)
 
-# %% [segment]  <-- delegable: forward pass -> per-pixel class mask
+# %% [segment]  <-- forward pass -> per-pixel class mask
 @torch.no_grad()
 def segment(gray):
     """single-channel frame (red or gray, see ritnet_input) -> (IN_H, IN_W) uint8 mask, class ids 0..3."""
@@ -150,7 +142,7 @@ def segment(gray):
     mask = out.argmax(dim=1).squeeze(0)  # (IN_H, IN_W)
     return mask.cpu().numpy().astype(np.uint8)
 
-# %% [measurement layer - PART 1: iris circle from the limbus]  <-- SPINE (Angela writes the math)
+# %% [measurement layer - PART 1: iris circle from the limbus]
 # Why: the eyelid covers the top/bottom of the iris, so a plain ellipse fit (5 DOF) wobbles
 # on the occluded vertical axis. We instead keep only the iris boundary points that touch the
 # SCLERA (the true limbus), and fit a CIRCLE (3 DOF), which the visible left/right arcs pin
@@ -234,16 +226,16 @@ def iris_circle(mask):
         return None
     return (float(cx), float(cy), float(r))
 
-# %% [measurement layer - PART 2: pupil inside the iris]  glint/masking = plumbing; threshold+blob+fit = SPINE (Angela)
+# %% [measurement layer - PART 2: pupil inside the iris]
 def disk_mask(circle, shape):
-    """Boolean (H, W) mask, True for pixels inside the (cx, cy, r) circle. Plumbing."""
+    """Boolean (H, W) mask, True for pixels inside the (cx, cy, r) circle."""
     cx, cy, r = circle
     yy, xx = np.ogrid[:shape[0], :shape[1]]
     return (xx - cx) ** 2 + (yy - cy) ** 2 <= r ** 2
 
 def remove_glint(bgr):
     """Inpaint specular highlights (bright AND low-saturation) so a glint sitting on the pupil
-    doesn't punch a bright hole in it or bias the fit. Plumbing."""
+    doesn't punch a bright hole in it or bias the fit."""
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
     s, v = hsv[..., 1], hsv[..., 2]
     glint = ((v >= GLINT_V) & (s <= GLINT_S)).astype(np.uint8) * 255
@@ -403,8 +395,8 @@ def build_curve(clip_path, roi, seed_box=None):
     return dict(t=t, iris_px=iris_px, pupil_px=pupil_px, ratio=pupil_px / iris_px,
                 valid=np.isfinite(pupil_px), onset_t=onset_t)
 
-# %% [test] fit_circle in isolation  <-- delegable: validates YOUR circle math, no RITnet needed
-# Run after implementing fit_circle, BEFORE the full pipeline. Run cells: imports -> Part 1 -> this.
+# %% [test] fit_circle in isolation  <-- validates the circle math, no RITnet needed
+# Run BEFORE the full pipeline. Run cells: imports -> Part 1 -> this.
 # The key case is #3: only the left/right arcs survive (lid covers top/bottom), and a 3-DOF
 # circle still recovers the radius. That is exactly why we chose circle over ellipse.
 if __name__ == "__main__":   # test cell: runs interactively / as a script, skipped on import
@@ -438,7 +430,7 @@ if __name__ == "__main__":   # test cell: runs interactively / as a script, skip
 
     print("\nfit_circle: asserted cases passed")
 
-# %% [test] fit_circle_robust convergence  <-- delegable: proves the iteration rejects outliers
+# %% [test] fit_circle_robust convergence  <-- proves the iteration rejects outliers
 # Plant a known circle (side arcs, like a real lidded iris), then inject the two junk types
 # we actually see: a CENTER BLOB (reflection mislabeled as sclera) and a LID STRAND (iris label
 # smeared along the lid). The naive one-shot fit gets dragged off; the iterated robust fit should
@@ -472,7 +464,7 @@ if __name__ == "__main__":   # test cell: runs interactively / as a script, skip
     assert robust_r < naive_err, "robust fit should beat the naive fit on the contaminated set"
     print("fit_circle_robust: converged and beat the naive fit")
 
-# %% [overlay helper]  <-- delegable debug dump
+# %% [overlay helper]  <-- debug dump
 def _draw_circle(img, circ, color):
     if circ is None:
         return
@@ -499,7 +491,7 @@ def overlay(frame_bgr, m):
     _draw_circle(vis, m.get("pupil_circle"), (0, 255, 0))   # green = fitted pupil circle
     return vis
 
-# %% [eye ROI]  <-- delegable: crop the eye so it fills the frame, RITnet-style
+# %% [eye ROI]  <-- crop the eye so it fills the frame, RITnet-style
 def _load_rois():
     return json.loads(ROI_FILE.read_text()) if ROI_FILE.exists() else {}
 
@@ -543,7 +535,7 @@ def crop(frame, roi):
     x, y, w, h = roi
     return frame[y:y + h, x:x + w]
 
-# %% [eye tracking]  <-- delegable (A5): follow the eye per-frame so handheld drift
+# %% [eye tracking]  <-- A5: follow the eye per-frame so handheld drift
 # does not push it out of the crop. A single fixed box only works when the camera is
 # static within a clip; on drifting clips (e.g. IMG_4569, ~570px of travel) the eye
 # leaves the frame and the masks fail. This tracks it.
@@ -680,12 +672,12 @@ if __name__ == "__main__":   # demo cell: runs interactively / as a script, skip
     ax[1].set_ylabel("pupil / iris"); ax[1].set_xlabel("time (s)")
     plt.tight_layout(); plt.show()
 
-# %% [eval harness]  <-- delegable eval scaffolding (valid% + C5 reporting), NOT spine math.
+# %% [eval harness]  <-- valid% + C5 reporting
 # Runs every clip through build_curve, RED vs GRAY, and reports the gate PASS RATE plus the
 # quality stats the doc's C5 asks for: frames measured, frames rejected, and the LONGEST
 # contiguous rejected run. A clip can be 70% valid overall yet have its entire pre-flash
-# baseline dropped, which makes it useless; valid% alone hides that. Onset t0 is YOUR spine,
-# so this stays t0-free and reports WHERE the longest gap sits (start-end time) instead, so a
+# baseline dropped, which makes it useless; valid% alone hides that. The harness
+# stays t0-free and reports WHERE the longest gap sits (start-end time) instead, so a
 # baseline-clustered failure is still visible. This is the before/after metric for the fine-tune.
 EVAL_STRIDE = 9          # coarser than CURVE_STRIDE for a faster sweep; lower = more detail, slower
 EVAL_MODES  = ["gray", "red"]   # channels to compare; drop one to halve the runtime
