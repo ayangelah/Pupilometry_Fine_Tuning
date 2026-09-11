@@ -1,0 +1,631 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		21F66D1F2B6B155B00B16C99 /* PupilDetection1App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F66D1E2B6B155B00B16C99 /* PupilDetection1App.swift */; };
+		21F66D212B6B155B00B16C99 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F66D202B6B155B00B16C99 /* ContentView.swift */; };
+		21F66D232B6B155C00B16C99 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 21F66D222B6B155C00B16C99 /* Assets.xcassets */; };
+		21F66D262B6B155C00B16C99 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 21F66D252B6B155C00B16C99 /* Preview Assets.xcassets */; };
+		21F66D302B6B155C00B16C99 /* PupilDetection1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F66D2F2B6B155C00B16C99 /* PupilDetection1Tests.swift */; };
+		21F66D3A2B6B155C00B16C99 /* PupilDetection1UITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F66D392B6B155C00B16C99 /* PupilDetection1UITests.swift */; };
+		21F66D3C2B6B155C00B16C99 /* PupilDetection1UITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F66D3B2B6B155C00B16C99 /* PupilDetection1UITestsLaunchTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		21F66D2C2B6B155C00B16C99 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 21F66D132B6B155B00B16C99 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 21F66D1A2B6B155B00B16C99;
+			remoteInfo = PupilDetection1;
+		};
+		21F66D362B6B155C00B16C99 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 21F66D132B6B155B00B16C99 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 21F66D1A2B6B155B00B16C99;
+			remoteInfo = PupilDetection1;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		216136902B6B4F39000B855A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		21F66D1B2B6B155B00B16C99 /* PupilDetection1.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PupilDetection1.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		21F66D1E2B6B155B00B16C99 /* PupilDetection1App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PupilDetection1App.swift; sourceTree = "<group>"; };
+		21F66D202B6B155B00B16C99 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		21F66D222B6B155C00B16C99 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		21F66D252B6B155C00B16C99 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		21F66D2B2B6B155C00B16C99 /* PupilDetection1Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PupilDetection1Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		21F66D2F2B6B155C00B16C99 /* PupilDetection1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PupilDetection1Tests.swift; sourceTree = "<group>"; };
+		21F66D352B6B155C00B16C99 /* PupilDetection1UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PupilDetection1UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		21F66D392B6B155C00B16C99 /* PupilDetection1UITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PupilDetection1UITests.swift; sourceTree = "<group>"; };
+		21F66D3B2B6B155C00B16C99 /* PupilDetection1UITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PupilDetection1UITestsLaunchTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		21F66D182B6B155B00B16C99 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		21F66D282B6B155C00B16C99 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		21F66D322B6B155C00B16C99 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		21F66D122B6B155B00B16C99 = {
+			isa = PBXGroup;
+			children = (
+				21F66D1D2B6B155B00B16C99 /* PupilDetection1 */,
+				21F66D2E2B6B155C00B16C99 /* PupilDetection1Tests */,
+				21F66D382B6B155C00B16C99 /* PupilDetection1UITests */,
+				21F66D1C2B6B155B00B16C99 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		21F66D1C2B6B155B00B16C99 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				21F66D1B2B6B155B00B16C99 /* PupilDetection1.app */,
+				21F66D2B2B6B155C00B16C99 /* PupilDetection1Tests.xctest */,
+				21F66D352B6B155C00B16C99 /* PupilDetection1UITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		21F66D1D2B6B155B00B16C99 /* PupilDetection1 */ = {
+			isa = PBXGroup;
+			children = (
+				216136902B6B4F39000B855A /* Info.plist */,
+				21F66D482B6B162100B16C99 /* Resources */,
+				21F66D492B6B166900B16C99 /* ViewController */,
+				21F66D242B6B155C00B16C99 /* Preview Content */,
+			);
+			path = PupilDetection1;
+			sourceTree = "<group>";
+		};
+		21F66D242B6B155C00B16C99 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				21F66D252B6B155C00B16C99 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		21F66D2E2B6B155C00B16C99 /* PupilDetection1Tests */ = {
+			isa = PBXGroup;
+			children = (
+				21F66D2F2B6B155C00B16C99 /* PupilDetection1Tests.swift */,
+			);
+			path = PupilDetection1Tests;
+			sourceTree = "<group>";
+		};
+		21F66D382B6B155C00B16C99 /* PupilDetection1UITests */ = {
+			isa = PBXGroup;
+			children = (
+				21F66D392B6B155C00B16C99 /* PupilDetection1UITests.swift */,
+				21F66D3B2B6B155C00B16C99 /* PupilDetection1UITestsLaunchTests.swift */,
+			);
+			path = PupilDetection1UITests;
+			sourceTree = "<group>";
+		};
+		21F66D482B6B162100B16C99 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				21F66D1E2B6B155B00B16C99 /* PupilDetection1App.swift */,
+				21F66D222B6B155C00B16C99 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		21F66D492B6B166900B16C99 /* ViewController */ = {
+			isa = PBXGroup;
+			children = (
+				21F66D202B6B155B00B16C99 /* ContentView.swift */,
+			);
+			path = ViewController;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		21F66D1A2B6B155B00B16C99 /* PupilDetection1 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 21F66D3F2B6B155C00B16C99 /* Build configuration list for PBXNativeTarget "PupilDetection1" */;
+			buildPhases = (
+				21F66D172B6B155B00B16C99 /* Sources */,
+				21F66D182B6B155B00B16C99 /* Frameworks */,
+				21F66D192B6B155B00B16C99 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PupilDetection1;
+			productName = PupilDetection1;
+			productReference = 21F66D1B2B6B155B00B16C99 /* PupilDetection1.app */;
+			productType = "com.apple.product-type.application";
+		};
+		21F66D2A2B6B155C00B16C99 /* PupilDetection1Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 21F66D422B6B155C00B16C99 /* Build configuration list for PBXNativeTarget "PupilDetection1Tests" */;
+			buildPhases = (
+				21F66D272B6B155C00B16C99 /* Sources */,
+				21F66D282B6B155C00B16C99 /* Frameworks */,
+				21F66D292B6B155C00B16C99 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				21F66D2D2B6B155C00B16C99 /* PBXTargetDependency */,
+			);
+			name = PupilDetection1Tests;
+			productName = PupilDetection1Tests;
+			productReference = 21F66D2B2B6B155C00B16C99 /* PupilDetection1Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		21F66D342B6B155C00B16C99 /* PupilDetection1UITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 21F66D452B6B155C00B16C99 /* Build configuration list for PBXNativeTarget "PupilDetection1UITests" */;
+			buildPhases = (
+				21F66D312B6B155C00B16C99 /* Sources */,
+				21F66D322B6B155C00B16C99 /* Frameworks */,
+				21F66D332B6B155C00B16C99 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				21F66D372B6B155C00B16C99 /* PBXTargetDependency */,
+			);
+			name = PupilDetection1UITests;
+			productName = PupilDetection1UITests;
+			productReference = 21F66D352B6B155C00B16C99 /* PupilDetection1UITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		21F66D132B6B155B00B16C99 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					21F66D1A2B6B155B00B16C99 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					21F66D2A2B6B155C00B16C99 = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = 21F66D1A2B6B155B00B16C99;
+					};
+					21F66D342B6B155C00B16C99 = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = 21F66D1A2B6B155B00B16C99;
+					};
+				};
+			};
+			buildConfigurationList = 21F66D162B6B155B00B16C99 /* Build configuration list for PBXProject "Visualyze" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 21F66D122B6B155B00B16C99;
+			productRefGroup = 21F66D1C2B6B155B00B16C99 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				21F66D1A2B6B155B00B16C99 /* PupilDetection1 */,
+				21F66D2A2B6B155C00B16C99 /* PupilDetection1Tests */,
+				21F66D342B6B155C00B16C99 /* PupilDetection1UITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		21F66D192B6B155B00B16C99 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21F66D262B6B155C00B16C99 /* Preview Assets.xcassets in Resources */,
+				21F66D232B6B155C00B16C99 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		21F66D292B6B155C00B16C99 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		21F66D332B6B155C00B16C99 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		21F66D172B6B155B00B16C99 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21F66D212B6B155B00B16C99 /* ContentView.swift in Sources */,
+				21F66D1F2B6B155B00B16C99 /* PupilDetection1App.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		21F66D272B6B155C00B16C99 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21F66D302B6B155C00B16C99 /* PupilDetection1Tests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		21F66D312B6B155C00B16C99 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21F66D3A2B6B155C00B16C99 /* PupilDetection1UITests.swift in Sources */,
+				21F66D3C2B6B155C00B16C99 /* PupilDetection1UITestsLaunchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		21F66D2D2B6B155C00B16C99 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 21F66D1A2B6B155B00B16C99 /* PupilDetection1 */;
+			targetProxy = 21F66D2C2B6B155C00B16C99 /* PBXContainerItemProxy */;
+		};
+		21F66D372B6B155C00B16C99 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 21F66D1A2B6B155B00B16C99 /* PupilDetection1 */;
+			targetProxy = 21F66D362B6B155C00B16C99 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		21F66D3D2B6B155C00B16C99 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		21F66D3E2B6B155C00B16C99 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		21F66D402B6B155C00B16C99 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"PupilDetection1/Preview Content\"";
+				DEVELOPMENT_TEAM = 7T7HHHQZSK;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PupilDetection1/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Visualyze;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses the camera to capture videos to record the eye";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app uses the camera to capture videos to record the eye";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.raje.PupilDetection;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		21F66D412B6B155C00B16C99 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"PupilDetection1/Preview Content\"";
+				DEVELOPMENT_TEAM = 7T7HHHQZSK;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PupilDetection1/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Visualyze;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses the camera to capture videos to record the eye";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app uses the camera to capture videos to record the eye";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.raje.PupilDetection;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		21F66D432B6B155C00B16C99 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3229557887;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.DanielGarcia.PupilDetection1Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PupilDetection1.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PupilDetection1";
+			};
+			name = Debug;
+		};
+		21F66D442B6B155C00B16C99 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3229557887;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.DanielGarcia.PupilDetection1Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PupilDetection1.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PupilDetection1";
+			};
+			name = Release;
+		};
+		21F66D462B6B155C00B16C99 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3229557887;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.DanielGarcia.PupilDetection1UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = PupilDetection1;
+			};
+			name = Debug;
+		};
+		21F66D472B6B155C00B16C99 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3229557887;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.DanielGarcia.PupilDetection1UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = PupilDetection1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		21F66D162B6B155B00B16C99 /* Build configuration list for PBXProject "Visualyze" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				21F66D3D2B6B155C00B16C99 /* Debug */,
+				21F66D3E2B6B155C00B16C99 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		21F66D3F2B6B155C00B16C99 /* Build configuration list for PBXNativeTarget "PupilDetection1" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				21F66D402B6B155C00B16C99 /* Debug */,
+				21F66D412B6B155C00B16C99 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		21F66D422B6B155C00B16C99 /* Build configuration list for PBXNativeTarget "PupilDetection1Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				21F66D432B6B155C00B16C99 /* Debug */,
+				21F66D442B6B155C00B16C99 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		21F66D452B6B155C00B16C99 /* Build configuration list for PBXNativeTarget "PupilDetection1UITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				21F66D462B6B155C00B16C99 /* Debug */,
+				21F66D472B6B155C00B16C99 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 21F66D132B6B155B00B16C99 /* Project object */;
+}
