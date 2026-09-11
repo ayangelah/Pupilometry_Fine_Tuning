@@ -11,12 +11,33 @@ debug_masks/
 eye_rois.json
 new_subject_rois.json
 light_onset.json
-# Eye crops and full-face frames: real faces/eyes (privacy), and large (~690MB). The hand-drawn
-# label JSONs sitting beside them ARE tracked: coordinates only, no embedded imageData, and they
-# are the source labelme_to_gt.py rebuilds labeling/gt.csv from. Images stay out, labels go in.
+
+# --- images and video: ignored EVERYWHERE by extension (privacy: real faces/eyes; also large) ---
+# Bracket patterns match any letter case, so IMG_1234.MOV or frame.PNG is caught even on a
+# case-sensitive filesystem (macOS ignores case by default, Linux does not).
+*.[pP][nN][gG]
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[hH][eE][iI][cC]
+*.[hH][eE][iI][fF]
+*.[wW][eE][bB][pP]
+*.[gG][iI][fF]
+*.[bB][mM][pP]
+*.[tT][iI][fF]
+*.[tT][iI][fF][fF]
+*.[mM][oO][vV]
+*.[mM][pP]4
+*.[mM]4[vV]
+*.[aA][vV][iI]
+*.[mM][kK][vV]
+# Exception: the iOS app's asset catalogs (app icon, UI images) must be tracked or a fresh
+# clone will not build. Never put eye footage in an asset catalog.
+!apps/ios/**/*.xcassets/**
+
+# Eye crops and full-face frames in labeling/ are covered by the image rules above. The
+# hand-drawn label JSONs sitting beside them ARE tracked: coordinates only, no embedded
+# imageData, and they are the source labelme_to_gt.py rebuilds labeling/gt.csv from.
 labeling/frames/
-labeling/frames_v2/**/*.png
-labeling/eyebox_review/**/*.png
 labeling/label_session/
 labeling/gt/
 labeling/roi_previews/
