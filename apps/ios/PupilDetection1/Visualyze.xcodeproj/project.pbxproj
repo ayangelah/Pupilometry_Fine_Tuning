@@ -14,6 +14,10 @@
 		21F66D302B6B155C00B16C99 /* PupilDetection1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F66D2F2B6B155C00B16C99 /* PupilDetection1Tests.swift */; };
 		21F66D3A2B6B155C00B16C99 /* PupilDetection1UITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F66D392B6B155C00B16C99 /* PupilDetection1UITests.swift */; };
 		21F66D3C2B6B155C00B16C99 /* PupilDetection1UITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F66D3B2B6B155C00B16C99 /* PupilDetection1UITestsLaunchTests.swift */; };
+		A17E00012C00000100C0DE01 /* LivePupilSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17E00112C00000100C0DE01 /* LivePupilSegmenter.swift */; };
+		A17E00022C00000100C0DE01 /* RITnet.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = A17E00122C00000100C0DE01 /* RITnet.mlpackage */; };
+		A17E00032C00000100C0DE01 /* RITnet_LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = A17E00132C00000100C0DE01 /* RITnet_LICENSE.txt */; };
+		A17E00042C00000100C0DE01 /* AnnotatedCaptureProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17E00142C00000100C0DE01 /* AnnotatedCaptureProcessor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,6 +49,10 @@
 		21F66D352B6B155C00B16C99 /* PupilDetection1UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PupilDetection1UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		21F66D392B6B155C00B16C99 /* PupilDetection1UITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PupilDetection1UITests.swift; sourceTree = "<group>"; };
 		21F66D3B2B6B155C00B16C99 /* PupilDetection1UITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PupilDetection1UITestsLaunchTests.swift; sourceTree = "<group>"; };
+		A17E00112C00000100C0DE01 /* LivePupilSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePupilSegmenter.swift; sourceTree = "<group>"; };
+		A17E00122C00000100C0DE01 /* RITnet.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = RITnet.mlpackage; sourceTree = "<group>"; };
+		A17E00132C00000100C0DE01 /* RITnet_LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = RITnet_LICENSE.txt; sourceTree = "<group>"; };
+		A17E00142C00000100C0DE01 /* AnnotatedCaptureProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotatedCaptureProcessor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +141,7 @@
 			children = (
 				21F66D1E2B6B155B00B16C99 /* PupilDetection1App.swift */,
 				21F66D222B6B155C00B16C99 /* Assets.xcassets */,
+				A17E00212C00000100C0DE01 /* Models */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -141,8 +150,19 @@
 			isa = PBXGroup;
 			children = (
 				21F66D202B6B155B00B16C99 /* ContentView.swift */,
+				A17E00112C00000100C0DE01 /* LivePupilSegmenter.swift */,
+				A17E00142C00000100C0DE01 /* AnnotatedCaptureProcessor.swift */,
 			);
 			path = ViewController;
+			sourceTree = "<group>";
+		};
+		A17E00212C00000100C0DE01 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A17E00122C00000100C0DE01 /* RITnet.mlpackage */,
+				A17E00132C00000100C0DE01 /* RITnet_LICENSE.txt */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -251,6 +271,7 @@
 			files = (
 				21F66D262B6B155C00B16C99 /* Preview Assets.xcassets in Resources */,
 				21F66D232B6B155C00B16C99 /* Assets.xcassets in Resources */,
+				A17E00032C00000100C0DE01 /* RITnet_LICENSE.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,6 +298,9 @@
 			files = (
 				21F66D212B6B155B00B16C99 /* ContentView.swift in Sources */,
 				21F66D1F2B6B155B00B16C99 /* PupilDetection1App.swift in Sources */,
+				A17E00012C00000100C0DE01 /* LivePupilSegmenter.swift in Sources */,
+				A17E00042C00000100C0DE01 /* AnnotatedCaptureProcessor.swift in Sources */,
+				A17E00022C00000100C0DE01 /* RITnet.mlpackage in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -446,6 +470,7 @@
 				INFOPLIST_FILE = PupilDetection1/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Visualyze;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses the camera to capture videos to record the eye";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app uses the camera to capture videos to record the eye";
@@ -484,6 +509,7 @@
 				INFOPLIST_FILE = PupilDetection1/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Visualyze;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture videos to record the eye";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses the camera to capture videos to record the eye";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app uses the camera to capture videos to record the eye";
