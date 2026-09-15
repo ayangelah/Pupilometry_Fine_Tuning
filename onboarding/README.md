@@ -1,48 +1,42 @@
-# Onboarding pipeline (new subjects -> label-ready frames)
+# Canonical data onboarding
 
-Turns raw full-face PLR clips into OpenEDS-reframed eye crops ready to hand-label for the
-detector fine-tune. Both eyes per clip (each an independent training sequence, same LOSO
-subject). Run from the repo root.
+This pipeline turns a new consented PLR clip into the reviewed eye crops used by training and
+validation. Hand-drawn, per-frame eyeboxes are the source of truth. The older Haar/static-ROI
+path remains available for experiments, but it does not write the canonical dataset.
 
 ## Flow
 
-```
-1. drop new clips in data/clips/  named  subject_<letter>_<n>.MOV   (both eyes, full face)
-2. python onboarding/detect_rois.py       # auto both-eye ROIs + clean -> new_subject_rois.json
-3. python onboarding/confirm_rois.py       # contact sheet -> debug_masks/onboarding/roi_confirm.png
-4.   ... eyeball the sheet; hand-fix any bad box in new_subject_rois.json (see below), re-run step 3
-5. python onboarding/extract_frames.py [N] # N frames/eye reframed to 400x640 -> labeling/frames/ + manifest.csv
-6.   ... hand-label the crops in Labelme -> convert to gt.csv/masks
-7.   ... add the new subject letters to SUBJECTS in finetune_ritnet.py, re-run LOSO
-```
+1. Put clips in `data/clips/`, named `subject_<letter>_<n>.MOV`.
+2. Add each clip to `onboarding/eye_inventory.json`: `L`, `R`, or `B` for the visible eye(s).
+3. Run `python onboarding/extract_frames.py [clip_stem ...]`.
+4. Open `labeling/eyebox_review` in Labelme. Draw one `eyebox` rectangle around every visible
+   eye in each sampled full-resolution frame.
+5. Run `python onboarding/build_reviewed_dataset.py --check`. Resolve every reported error.
+6. Run `python onboarding/build_reviewed_dataset.py`. This writes `frames_v2`,
+   `manifest_v2.csv`, and the `_full` tracking seeds in `new_subject_rois.json`.
+7. Label iris/pupil circles according to `labeling/HOW_TO_LABEL.md`.
+8. Run `python labeling/labelme_to_gt.py --strict` to rebuild `gt.csv` and masks.
 
-Steps 2 and 5 are idempotent: `detect_rois` skips clips already in `new_subject_rois.json`,
-`extract_frames` skips sequences already in `manifest.csv`. Safe to re-run as subjects arrive.
+The sample set is 10/30/50/70/90% of each clip plus a 35% `full` frame. The builder uses the
+same deterministic positions and OpenEDS reframing as the current 351-frame dataset. Its
+`--check` mode reconstructs the crop metadata without writing files and compares it to the
+existing manifest.
 
-**Manual boxing (`box_eyes.py`) — the reliable alternative to steps 2-4.** `detect_rois` (Haar)
-assumes both eyes are visible and stumbles on single-eye / angled clips. `box_eyes.py` is an
-interactive click-drag tool (VS Code `# %%` cells, needs `pip install ipympl`): for each clip you
-drag a box around **each visible eye** — one for a single-eye/angled clip, two for full-face — and
-it writes them straight to `new_subject_rois.json`. This handles the 1-eye AND 2-eye cases
-explicitly, and mirrors the deployed alignment overlay (you place the box the nurse aligns to).
-Use it instead of `detect_rois` when footage is mixed, or to fix any box the contact sheet flags.
+`left_eye` and `right_eye` are always the patient's anatomical sides. The capture app uses
+unmirrored rear-camera video, so in a two-eye frame the patient's right eye is image-left and
+the patient's left eye is image-right. Normalize mirrored imports before onboarding; `L`/`R`
+inventory entries are authoritative for clips containing only one eye. Do not mark a clip `B`
+merely because the eye crosses the image midpoint: `B` means that both anatomical eyes can be
+independently labeled in at least one reviewed frame.
 
-## Fixing a bad ROI (step 4)
+## Timing
 
-The contact sheet is the QC. Any cell not centred on an eye is wrong. Edit
-`new_subject_rois.json` (keys `<stem>_L` / `<stem>_R`, boxes `[x, y, w, h]` in original pixels):
+`manifest_v2.csv` records each source frame's decoded video time. Average FPS is never treated
+as a universal 120-fps clock. The capture app's sidecar will be authoritative for future torch
+onset; QuickTime-era clips retain manually marked video-time onset values.
 
-- **Mirror a good eye** onto its missing/bad partner: `R = [W - Lx - Lw, Ly, Lw, Lh]` (W = frame width).
-- **Drop a clip** (e.g. low-res / undetectable): delete both its `_L` and `_R` entries.
+## Legacy utilities
 
-Then re-run `confirm_rois.py`.
-
-## Notes
-
-- 4K random-seek makes detection slow (~30-45s/clip); expect a few minutes per batch.
-- Haar is imperfect on dim / gaze-off / low-res footage, so the manual QC pass is expected.
-- `detect_rois` treats a box much smaller than, or far off the height of, its partner as a
-  false detection and mirror-fills; it can still miss, hence the contact sheet.
-- Outputs: `new_subject_rois.json` (gitignored, tied to private clips), overlays +
-  contact sheet in `debug_masks/onboarding/` (gitignored), crops in `labeling/frames/`
-  (gitignored), rows in `labeling/manifest.csv` (tracked, coords only).
+`detect_rois.py`, `confirm_rois.py`, and `box_eyes.py` predate the per-frame reviewed dataset.
+They can help explore a new clip or make an initial tracking seed, but their boxes must not
+silently replace the hand-reviewed boxes in `eyebox_review`.

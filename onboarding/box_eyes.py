@@ -22,21 +22,7 @@ REPO = Path(__file__).resolve().parent.parent
 ROIS = REPO / "new_subject_rois.json"
 CLIPS = REPO / "data" / "clips"
 
-# Eye classifications (from user's tagging: 1=B, 2=B, ..., 40=B)
-EYE_CLASSES = {
-    "subject_a_1": "B", "subject_a_2": "B", "subject_a_4": "B", "subject_a_5": "B",
-    "subject_a_6": "B", "subject_a_7": "L", "subject_a_8": "B",
-    "subject_b_1": "L", "subject_b_2": "L", "subject_b_3": "B", "subject_b_4": "B",
-    "subject_c_1": "R",
-    "subject_d_1": "R", "subject_d_2": "B",
-    "subject_e_1": "B", "subject_e_2": "B", "subject_e_3": "L", "subject_e_4": "R",
-    "subject_f_1": "B", "subject_f_2": "B", "subject_f_3": "L", "subject_f_4": "R",
-    "subject_g_1": "L", "subject_g_2": "B",
-    "subject_h_1": "R", "subject_h_2": "B", "subject_h_3": "L", "subject_h_4": "B",
-    "subject_i_1": "B", "subject_i_2": "B", "subject_i_3": "L", "subject_i_4": "R",
-    "subject_j_1": "R", "subject_j_2": "L", "subject_j_3": "B", "subject_j_4": "B",
-    "subject_k_1": "L", "subject_k_2": "R", "subject_k_3": "B", "subject_k_4": "B",
-}
+EYE_CLASSES = json.loads((Path(__file__).resolve().parent / "eye_inventory.json").read_text())
 
 def get_first_frame(clip_stem):
     """Load the first frame of a clip."""
@@ -114,13 +100,18 @@ def box_one_clip(clip_stem):
         rois[f"{clip_stem}_right_eye"] = boxes[0]
         print(f"  ✓ {clip_stem}_right_eye: {boxes[0]}")
     else:  # 'B' for both
-        # Both eyes: sort by x position (left, then right)
+        # Rear-camera frames are unmirrored: image-left is the patient's right eye.
         sorted_boxes = sorted(boxes, key=lambda b: b[0])
-        rois[f"{clip_stem}_left_eye"] = sorted_boxes[0]
-        print(f"  ✓ {clip_stem}_left_eye: {sorted_boxes[0]}")
-        if len(sorted_boxes) > 1:
-            rois[f"{clip_stem}_right_eye"] = sorted_boxes[1]
-            print(f"  ✓ {clip_stem}_right_eye: {sorted_boxes[1]}")
+        if len(sorted_boxes) == 1:
+            box = sorted_boxes[0]
+            side = "right" if box[0] + box[2] / 2 < frame.shape[1] / 2 else "left"
+            rois[f"{clip_stem}_{side}_eye"] = box
+            print(f"  ✓ {clip_stem}_{side}_eye: {box}")
+        else:
+            rois[f"{clip_stem}_right_eye"] = sorted_boxes[0]
+            print(f"  ✓ {clip_stem}_right_eye: {sorted_boxes[0]}")
+            rois[f"{clip_stem}_left_eye"] = sorted_boxes[1]
+            print(f"  ✓ {clip_stem}_left_eye: {sorted_boxes[1]}")
 
     json.dump(rois, open(ROIS, "w"), indent=1)
     return True

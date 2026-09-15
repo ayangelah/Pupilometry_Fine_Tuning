@@ -1,10 +1,10 @@
 # --- licensed datasets (MOBIUS/SBVPI, Univ. Ljubljana): non-commercial research licence,
 # GDPR Art. 9 biometric data. They live OUTSIDE the repo (../datasets/); this is a backstop
 # against an accidental copy-in + add. NEVER commit these. ---
-datasets/
+/datasets/
 
 # --- data & generated outputs (privacy: real faces/eyes; also large) ---
-data/
+/data/
 debug_frames/
 debug_masks/
 # ROI boxes / light-onset marks tied to the private clips; useless without them

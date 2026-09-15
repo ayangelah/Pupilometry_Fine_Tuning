@@ -7,7 +7,7 @@ score for the detector, held out by subject (LOSO). These masks are also the fin
 
 ```bash
 conda activate labelme-env
-labelme labeling/frames --labels pupil,iris,sclera,reject --nodata --autosave
+labelme labeling/frames_v2/<sequence> --labels iris,pupil,sclera,reject --nodata --autosave
 ```
 
 - `--nodata` keeps each JSON small (does not embed the image).
@@ -19,7 +19,7 @@ labelme labeling/frames --labels pupil,iris,sclera,reject --nodata --autosave
 | Region | Labelme tool | How | Label (exact) |
 |---|---|---|---|
 | **Iris** | **Circle** | Click the iris center, drag to the limbus (iris/sclera edge). Draw the **full disk even under the eyelids** - irises are circles at our granularity, and we grade the model on the full circle. | `iris` |
-| **Pupil** | **Polygon** | Trace the actual pupil boundary point by point. Do **not** assume it is round; follow what you see. | `pupil` |
+| **Pupil** | **Circle** | Click the pupil center and drag to its visible edge. This is measurement ground truth for pupil diameter, matching the circular output used by the app. | `pupil` |
 | **Sclera** | Polygon | (Optional) Outline the visible white. Skip if short on time. | `sclera` |
 | Background | (nothing) | Leave everything else untraced. | - |
 
@@ -28,11 +28,15 @@ labelme labeling/frames --labels pupil,iris,sclera,reject --nodata --autosave
 1. **Labels must be exactly** `pupil`, `iris`, `sclera` (lowercase). The converter keys on these.
 2. **Draw from scratch** - trace what the pixels show, do not trace-over any model overlay. (This is the *test* set; anchoring to the model's guess would flatter its score.)
 3. **One iris and one pupil per frame.**
-4. **Unlabelable frame** (blink, heavy motion blur, pupil truly invisible): draw a small **rectangle labeled `reject`** and nothing else. This marks it as a *true* reject, distinct from "not labeled yet" - we need that distinction.
-5. Save happens automatically; a frame with no JSON = not done yet.
+4. **Pupil boundary invisible but iris traceable:** draw the iris circle and omit the pupil. This becomes `iris_only` / `not_visible`; it teaches measurement confidence, not a fake “no pupil” segmentation target.
+5. **Whole frame unusable** (blink, heavy blur, occlusion, no trustworthy iris): select Labelme's rectangle tool, draw a small rectangle anywhere, name it **`reject`**, and draw nothing else. The rectangle location and size have no meaning; its presence is an image-level status marker.
+6. **No JSON means pending**, not rejected. Save an explicit `reject` annotation when review is complete but the frame is unusable.
 
 ## Notes
 
 - You are labeling the **reframed eye crop the model sees**, so your masks line up with predictions with no coordinate guesswork.
-- Subject grouping for the LOSO split is in `labeling/manifest.csv` (person A/B/C per clip). Do not move frames between clips.
+- Subject grouping and reviewed per-frame eyeboxes are in `labeling/manifest_v2.csv`. Do not move frames between sequences.
 - Once a few are done, run the converter (Labelme JSON -> class masks + derived diameters) on them and check the output before labeling the rest.
+
+Run `python labeling/labelme_to_gt.py --strict` for the final build. Strict mode fails if any
+crop still has no JSON or any label violates the schema.
