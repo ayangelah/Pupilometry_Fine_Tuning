@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "run_id": "ritnet_pretrained_20260915T183427Z",
+  "created_utc": "2026-09-15T18:34:28.097315+00:00",
+  "purpose": "untouched pretrained RITnet baseline; inference only",
+  "checkpoint": {
+    "path": "RITnet/best_model.pkl",
+    "sha256": "02de259b8fe2e26e825101bb5d3f54b48a13a1a264eb0631c367db4596d0defa",
+    "parameter_count": 248900,
+    "architecture": "RITnet DenseNet2D, dropout=True, probability=0.2, eval mode"
+  },
+  "git": {
+    "commit": "3f8eb8e342bf7344b609c52ea222997a911dadad",
+    "dirty": true,
+    "changed_path_count": 278,
+    "ritnet_commit": "6431c57ce7bf0eda935fb6178b926ae9440b50bf"
+  },
+  "source_sha256": {
+    "evaluate_pretrained.py": "efe753c52e5d0d3d55852c125aa57c7b73f13cc3faee5be4cd7ad8aa6d3d1ab6",
+    "ritnet_segment.py": "3b5d0ce7f9f3a62250f2325ff07d2596131a99cd3f2085fc0876549e2c89b2cb",
+    "densenet.py": "b1f4964e318ad25f0b50c84c7f749349fcfccc39de3fb22db241059638aba0a5"
+  },
+  "runtime": {
+    "python": "3.11.5 (main, Sep 11 2023, 08:31:25) [Clang 14.0.6 ]",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "torch": "2.12.1",
+    "opencv": "4.10.0",
+    "numpy": "1.24.3",
+    "device": "mps"
+  },
+  "evaluation": {
+    "channels": [
+      "gray",
+      "red"
+    ],
+    "input_width": 400,
+    "input_height": 640,
+    "batch_size": 4,
+    "bootstrap_samples": 10000,
+    "bootstrap_seed": 20260915,
+    "primary_universe": "all integrity-eligible labeled frames; edge-clipped frames included",
+    "pupil_scoring_universe": "category=full only",
+    "iris_mm_assumption": 11.7,
+    "preprocessing": "selected RGB channel -> gamma 0.8 -> CLAHE(1.5, 8x8) -> [0,1] -> [-1,1]",
+    "postprocessing": "current ritnet_segment.py circle fit plus documented geometry gate",
+    "temporal_smoothing": "none; independent labeled frames",
+    "class_ids": {
+      "0": "background",
+      "1": "sclera",
+      "2": "iris",
+      "3": "pupil"
+    }
+  },
+  "dataset_audit": {
+    "status": "clean",
+    "gt_rows": 351,
+    "eligible_rows": 351,
+    "excluded_gt_rows": 0,
+    "categories_in_gt": {
+      "full": 192,
+      "iris_only": 159
+    },
+    "eligible_categories": {
+      "full": 192,
+      "iris_only": 159
+    },
+    "eligible_subjects": {
+      "A": 73,
+      "B": 36,
+      "C": 6,
+      "D": 18,
+      "E": 36,
+      "F": 36,
+      "G": 11,
+      "H": 35,
+      "I": 36,
+      "J": 36,
+      "K": 28
+    },
+    "eligible_sequences": 61,
+    "edge_clipped_eligible_rows": 39,
+    "frame_pngs": 351,
+    "label_jsons": 351,
+    "pending_pngs_without_json": [],
+    "label_jsons_without_gt_row": [],
+    "issues": [],
+    "dataset_sha256": "ae5d5445aa766996c8382e465bcfa8b9457cb2c4e2549c519a90e0792507ff24"
+  }
+}

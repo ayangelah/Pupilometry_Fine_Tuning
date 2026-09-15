@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "ritnet_external_sbvpi_20260915T190055Z",
+  "created_utc": "2026-09-15T19:00:55.437677+00:00",
+  "dataset": "sbvpi",
+  "dataset_inventory": {
+    "available_rgb_images": 1856,
+    "pupil_masks": 121,
+    "iris_masks": 128,
+    "sclera_masks": 1840,
+    "complete_evaluation_samples": 120,
+    "subjects": 19
+  },
+  "dataset_source_file_count": 481,
+  "dataset_inventory_sha256": "cb051075113b92104154d1e809af0406f8106e31273ad60bf50d51e6b280fb87",
+  "checkpoint_sha256": "02de259b8fe2e26e825101bb5d3f54b48a13a1a264eb0631c367db4596d0defa",
+  "parameter_count": 248900,
+  "source_sha256": {
+    "evaluate_external.py": "9777e5bb50657e439deea7205a7542fdd78421457eeb3e42a921cd27af2ce461",
+    "ritnet_segment.py": "3b5d0ce7f9f3a62250f2325ff07d2596131a99cd3f2085fc0876549e2c89b2cb",
+    "densenet.py": "b1f4964e318ad25f0b50c84c7f749349fcfccc39de3fb22db241059638aba0a5"
+  },
+  "git_commit": "3f8eb8e342bf7344b609c52ea222997a911dadad",
+  "runtime": {
+    "python": "3.11.5 (main, Sep 11 2023, 08:31:25) [Clang 14.0.6 ]",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "torch": "2.12.1",
+    "opencv": "4.10.0",
+    "numpy": "1.24.3",
+    "device": "mps"
+  },
+  "evaluation": {
+    "channels": [
+      "gray",
+      "red"
+    ],
+    "input_width": 400,
+    "input_height": 640,
+    "framing": "oracle visible-eye union; width_fill=1.05; aspect-preserving crop with replicated image padding",
+    "preprocessing": "selected RGB channel -> gamma 0.8 -> CLAHE(1.5, 8x8) -> [0,1] -> [-1,1]",
+    "postprocessing": "none; argmax class mask only",
+    "class_ids": {
+      "0": "background",
+      "1": "sclera",
+      "2": "iris",
+      "3": "pupil"
+    }
+  }
+}

@@ -1,8 +1,7 @@
 # Pupillometry from a phone camera
 
-Recover pupillometer-grade measurements — pupil diameter over time and the pupillary light
-reflex (PLR) metrics derived from it — from a short eye-video clip on a phone, **offline and
-on-device, with no dedicated hardware.**
+Estimate pupil diameter over time and pupillary light-reflex (PLR) metrics from a short
+eye-video clip on a phone, **offline and on-device, with no dedicated hardware.**
 
 > **Positioning.** A triage / screening aid, **not** an FDA-cleared diagnostic. No equivalence
 > is claimed to cleared devices (e.g. the NeurOptics NPi). The target user is a nurse or first
@@ -51,7 +50,9 @@ flowchart LR
 ```
 
 - **RITnet** ([Chaudhary et al.](https://github.com/AayushKrChaudhary/RITnet)), a 0.25 M-param
-  segmentation net (background / sclera / iris / pupil), real-time by design. It expects
+  segmentation net (background / sclera / iris / pupil). The weight file is small, but the
+  current 400×640 network is still compute-heavy; device latency/resolution ablation remains
+  required. It expects
   near-eye, OpenEDS-style framing, so each clip is cropped to the eye and reframed before
   inference — the single highest-leverage fix in the project (nearly every early failure traced
   to framing, not the algorithm).
@@ -82,15 +83,18 @@ flowchart LR
 
 The project's strongest results are the ones that *redirected* it:
 
-- **The dark-eye failure is capture-quality, not the model.** Running the base RITnet on
-  high-resolution DSLR-macro brown irises (SBVPI, ground-truth-framed) gave **0.87 pupil recall
-  / 0.84 IoU** — versus ~0.36 on phone footage. So the model *can* segment brown pupils given a
-  clean image; the phone regime (dim, high-gain, dilated) is the bottleneck. This **demoted a
-  large planned training effort** that wouldn't have moved the needle.
+- **The frozen SBVPI control confirms a large capture/domain gap.** On 120 complete,
+  oracle-framed DSLR samples across 19 subjects, untouched RITnet reached subject-macro pupil IoU
+  0.876 with grayscale and **0.914 with red**, plus red iris-disk IoU 0.884. The 46 complete
+  brown-eye samples had frame-mean red pupil IoU 0.933. This proves the checkpoint can segment
+  clean, localized visible-light eyes—including brown eyes—but does not test phone localization,
+  motion, low light, temporal tracking, or PLR dynamics.
 - **Honest nulls, recorded, not buried:**
-  - *Fine-tune at n=3 subjects* overfits and loses to the pretrained baseline on held-out
-    subjects. Cross-validation *measures* generalization; it doesn't create it. The lever is
-    more subjects — now being onboarded (5→9).
+  - *Fine-tuning at n=11 subjects* remains break-even and varies by held-out subject. The latest
+    visibility-aware LOSO run changed macro pupil detection by +1.0 points but all-frame pupil
+    IoU by -0.4 points and detected-only diameter error by +1.0 points (worse). The visibility
+    head itself reached only 48.5% macro accuracy / 22.6% visible-boundary recall, so those
+    checkpoints are experimental and must not replace the pretrained production candidate.
   - *Temporal averaging* of dark frames was motion-confounded (registration blur); parked, not
     claimed as a win.
   - *Automated gaze-filtering* from per-frame iris-fit centers measured fit-jitter, not gaze
@@ -99,6 +103,11 @@ The project's strongest results are the ones that *redirected* it:
 **Evaluation discipline:** accuracy is measured with hand-labeled masks (IoU + diameter error)
 under a **leave-one-subject-out** split — never a frame-level split, because 120 fps neighbors
 leak near-identical frames across train and test.
+
+The frozen pretrained checkpoint is now measured independently by `evaluate_pretrained.py`.
+It records checkpoint/data/code hashes and keeps raw segmentation, circle reconstruction, and
+product-gate failures separate, with per-subject results and subject-bootstrap confidence
+intervals. See `evaluation/README.md`; fine-tuning stays parked until it beats this exact contract.
 
 ---
 
@@ -129,10 +138,12 @@ and "brisk/sluggish/fixed" has poor inter-rater agreement.
 ```
 ritnet_segment.py        detector integration + measurement layer (Stage 1)
 plr_metrics.py           mm calibration + PLR metric formulas + validity gate (Stage 2)
-finetune_ritnet.py       LOSO fine-tune pipeline (subject-level split, anchored targets)
-onboarding/              reusable pipeline: raw clips -> both-eye ROIs -> label-ready crops
-labeling/                Labelme -> 4-class GT conversion + the labeled dataset scaffolding
-extract_pupil_diameter.py   classical OpenCV baseline (not the detector)
+video_timing.py          decoded-frame timestamps; no universal-FPS assumption
+evaluate_pretrained.py   frozen RITnet baseline + subject-clustered uncertainty
+finetune_ritnet.py       visibility-aware LOSO fine-tune pipeline
+onboarding/              clips -> hand-reviewed per-frame eyeboxes -> frames_v2
+labeling/                circle-label schema -> derived masks and measurement GT
+apps/ios/                native Swift capture + experimental Core ML live overlay
 ```
 
 ### Setup
@@ -142,21 +153,30 @@ pip install -r requirements.txt
 git clone https://github.com/AayushKrChaudhary/RITnet.git   # detector, not vendored here
 ```
 
-Scripts use VS Code `# %%` interactive cells. Input clips go in `data/clips/`; sample data is
-not included (it contains identifiable biometric faces, handled under written consent).
+Input clips go in `data/clips/`; sample data is not included because it contains identifiable
+biometric footage handled under written consent. See `onboarding/README.md` for the canonical
+reviewed-eyebox pipeline. The checked-in `subject_b_2` readout uses footage specifically approved
+for public demo use; the consent record itself belongs in restricted storage, not this repository.
 
 ---
 
 ## Status & roadmap
 
-**Done:** the measurement engine and demo readout (Stages 1–2) — calibration, all
-constriction-side PLR metrics with noise-robust velocities, the validity gate, and a
-clinician-style report. Fine-tune pipeline built and evaluated. Diagnostics above complete.
+**Done:** the Python measurement engine and demo readout, 351 hand-labeled
+frames from reviewed per-frame eyeboxes, subject-held-out
+evaluation, mixed-FPS decoded-frame timing, a
+visibility-aware fine-tuning path, and an experimental iOS Core ML export/live single-eye
+overlay. The mobile path uses the pretrained checkpoint because the current LOSO fine-tune did
+not qualify as an improvement; it is a feedback instrument, not a validated measurement path.
 
-**Next:** more labeled subjects → re-run the LOSO fine-tune (domain-adaptation to the phone-dim
-regime); a Flutter on-device port with an alignment-overlay ("software eyecup") capture UI; and
-a learned normal-vs-abnormal reflex scorer once labeled abnormal cases are available.
+**Next:** run the physical-iPhone acceptance pass, tag visual failure causes, and execute one
+controlled postprocessing ablation around the dominant concentricity-gate failures. The current
+label audit is clean, and the bundled Core ML export reached 99.9793% minimum pixel-class agreement
+with PyTorch on three parity crops. Only after those checks should another fine-tune or
+lower-resolution model be trained. Physical-iPhone latency, thermal behavior, saved-video cadence,
+Swift preprocessing parity, and the `.capture.json` sidecar remain required parts of the baseline.
 
 **Known limits:** the 11.7 mm iris constant and off-axis foreshortening are stated error
-sources; recall degrades on dark irises in dim light (visible-light vs infrared physics); and
-the clinical validation is early (small n, no gold-standard comparison yet).
+sources; recall degrades on dark irises in dim light (visible-light vs infrared physics); older
+QuickTime clips have manual rather than hardware-synchronized light onset; and clinical
+validation is early (small n, no paired reference-device comparison yet).
