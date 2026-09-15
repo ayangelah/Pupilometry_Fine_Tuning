@@ -25,9 +25,9 @@ uses standard stabilization, or low-latency stabilization where the OS and forma
 The saved movie uses HEVC when available. Model buffers are preview-sized 8-bit YUV proxies; this
 keeps live inference from forcing the recorded movie down to model resolution and lets AVFoundation
 respond more quickly to focus, exposure, and white-balance changes. The one-eye inference adapter
-uses the same Device RGB conversion and exact independent X/Y resize as the best-performing
-on-device prototype. Do not replace that resize with a single aspect-preserving scale: the model
-requires a fully populated 400x640 tensor.
+implements Device RGB conversion and the intended independent X/Y resize. Do not replace that
+resize with a single aspect-preserving scale: the model requires a fully populated 400x640 tensor.
+Exact Swift-produced input-tensor parity with Python has not yet been measured.
 
 ## Alignment and image-quality guidance
 
@@ -76,6 +76,10 @@ identifies when software asked the torch to change.
 
 ## On-device acceptance check
 
+The first iPhone 17 Pro smoke test on September 15, 2026 produced qualitatively strong live pupil
+and iris tracking. That is encouraging integration feedback, not a quantitative accuracy or speed
+result. The checklist below remains open until its evidence is saved from representative captures.
+
 Run a clean install on each target iPhone and verify:
 
 1. Both modes show the expected active resolution, cadence, HDR state, device, and stabilization in
@@ -97,4 +101,6 @@ not reproduce exactly.
 The bundled model can be reproduced with `pip install -r requirements-coreml.txt` followed by
 `python export_coreml.py`. Core ML export dependencies are development-only and are not required by
 the iOS app at runtime. The exporter refuses to overwrite an existing package and verifies
-pixel-class parity against real labeled-eye crops before accepting a new export.
+pixel-class parity against real labeled-eye crops before accepting a new export. The checked-in
+package reached 99.9793% minimum pixel-class agreement with PyTorch on three crops; that comparison
+starts from an already-preprocessed tensor and does not verify the Swift camera-to-tensor path.

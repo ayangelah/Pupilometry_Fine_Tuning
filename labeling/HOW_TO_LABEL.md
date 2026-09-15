@@ -27,7 +27,7 @@ labelme labeling/frames_v2/<sequence> --labels iris,pupil,sclera,reject --nodata
 
 1. **Labels must be exactly** `pupil`, `iris`, `sclera` (lowercase). The converter keys on these.
 2. **Draw from scratch** - trace what the pixels show, do not trace-over any model overlay. (This is the *test* set; anchoring to the model's guess would flatter its score.)
-3. **One iris and one pupil per frame.**
+3. **One iris per usable frame and at most one pupil.** Omit the pupil only under rule 4.
 4. **Pupil boundary invisible but iris traceable:** draw the iris circle and omit the pupil. This becomes `iris_only` / `not_visible`; it teaches measurement confidence, not a fake “no pupil” segmentation target.
 5. **Whole frame unusable** (blink, heavy blur, occlusion, no trustworthy iris): select Labelme's rectangle tool, draw a small rectangle anywhere, name it **`reject`**, and draw nothing else. The rectangle location and size have no meaning; its presence is an image-level status marker.
 6. **No JSON means pending**, not rejected. Save an explicit `reject` annotation when review is complete but the frame is unusable.

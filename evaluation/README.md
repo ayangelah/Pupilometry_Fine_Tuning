@@ -47,11 +47,13 @@ excellent measurement and rejects the rest is not strong.
 Before calling the baseline final:
 
 1. Reconcile every label/manifest mismatch and pending frame reported by the dataset audit.
+   This is complete: all 351 eligible frames are accounted for with no pending or orphan labels.
 2. Compare PyTorch and Core ML logits or class masks on the exact same exported crops.
    This is complete for the bundled export: minimum class agreement was 99.9793% across three
    crops. See `runs/coreml_parity_20260915/report.md`.
 3. Measure model latency, end-to-end latency, sustained FPS, and thermal behavior on the target
-   iPhone.  Host timing is not a substitute.
+   iPhone. A first qualitative smoke test was encouraging, but host timing and perceived
+   responsiveness are not substitutes for saved on-device measurements.
 4. Add frame-level failure tags for blur, illumination, reflection, eyelid/lash occlusion, gaze,
    and clipping.  Automated pipeline failures are already emitted; visual causes still require
    review.

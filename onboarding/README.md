@@ -32,8 +32,9 @@ independently labeled in at least one reviewed frame.
 ## Timing
 
 `manifest_v2.csv` records each source frame's decoded video time. Average FPS is never treated
-as a universal 120-fps clock. The capture app's sidecar will be authoritative for future torch
-onset; QuickTime-era clips retain manually marked video-time onset values.
+as a universal 120-fps clock. For new app captures, the sidecar's timestamped luma samples are the
+source for confirming optical torch onset after the recorded API request bound. QuickTime-era
+clips retain manually marked video-time onset values.
 
 ## Legacy utilities
 
