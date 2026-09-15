@@ -16,6 +16,8 @@ import sys, cv2, json
 from pathlib import Path
 from collections import OrderedDict
 
+from video_timing import capture_fps, decoded_frame_time
+
 CLIPS_DIR = Path("data/clips")
 
 def find_onset(clip_stem):
@@ -27,7 +29,7 @@ def find_onset(clip_stem):
         return None
 
     cap = cv2.VideoCapture(str(clip_path))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 120.0
+    fps = capture_fps(cap)
     n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     frame_idx = 0
@@ -39,16 +41,20 @@ def find_onset(clip_stem):
     print("SPACE=play/pause, LEFT/RIGHT=frame, d=mark onset, s=skip, q=quit")
     print(f"{'='*60}")
 
+    window = "Light onset marker"
+    cv2.namedWindow(window, cv2.WINDOW_NORMAL)
     while True:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         ok, frame = cap.read()
         if not ok:
             break
 
-        time_s = frame_idx / fps
+        # This is the timestamp of the decoded frame, not frame_index / an assumed rate.
+        time_s, _ = decoded_frame_time(cap, frame_idx, fps)
         title = f"{clip_stem} | Frame {frame_idx}/{n_frames} | Time {time_s:.3f}s"
 
-        cv2.imshow(title, frame)
+        cv2.imshow(window, frame)
+        cv2.setWindowTitle(window, title)
         key = cv2.waitKey(30 if playing else 0) & 0xFF
 
         if key == ord(' '):
@@ -57,7 +63,7 @@ def find_onset(clip_stem):
             print(f"\n✓ Onset marked: frame {frame_idx}, time {time_s:.3f}s")
             with open("light_onset.json") as f:
                 data = json.load(f)
-            data[clip_stem] = round(time_s, 2)
+            data[clip_stem] = round(time_s, 6)
             with open("light_onset.json", "w") as f:
                 json.dump(data, f, indent=2)
             print(f"Updated light_onset.json")

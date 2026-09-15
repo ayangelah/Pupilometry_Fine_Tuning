@@ -5,8 +5,8 @@
 # (dict: t, iris_px, pupil_px, ratio, valid, onset_t) and turns it into a
 # clinician-style readout: 1c mm calibration, 1d the six PLR metrics, 1e the readout.
 #
-# Unimplemented metrics raise NotImplementedError with the formula stated in words
-# plus the NPi healthy-adult normative, so the contract is explicit before coding it.
+# Metric formulas are explicit and device-independent. Comparisons with a commercial device
+# belong in a paired validation report, not beside an individual prototype reading.
 
 # %% [imports]
 from __future__ import annotations
@@ -38,6 +38,7 @@ BASELINE_END_MS  = 150.0   # end the window before constriction can begin (< ~18
 # an artefact of a sparse/noisy curve, not the constriction floor. Bounds the phase-end search
 # in constriction_velocity.
 MIN_LATENCY_MS = 180.0
+MIN_RECOVERY_SECONDS = 0.40  # do not report dilation when the nadir is at the clip boundary
 
 # Clip-level validity gate thresholds (tune these; they are the knobs).
 MIN_VALID_FRAC      = 0.40   # below this gate pass-rate the whole curve is too sparse to trust
@@ -67,15 +68,14 @@ def calibrate_mm(curve: dict, iris_mm: float = IRIS_MM) -> np.ndarray:
 
 @dataclass
 class PLRMetrics:
-    """One clip's PLR readout, all diameters in mm, velocities in mm/s, times in s.
-    NPi healthy-adult normatives shown for sanity-checking the outputs."""
-    baseline_mm:      float   # resting/initial diameter (snap-baseline). NPi ~4.38
-    min_mm:           float   # minimum diameter after onset.            NPi ~2.87
-    pct_constriction: float   # (baseline - min) / baseline * 100.       NPi ~34.7
-    latency_s:        float   # onset -> start of constriction.          NPi ~0.23
-    cv_peak_mm_s:     float   # peak (max) constriction velocity (MCV).  NPi ~4.16
-    cv_mean_mm_s:     float   # mean constriction velocity (CV).         NPi ~2.74
-    dv_mm_s:          float   # dilation (recovery) velocity.            NPi ~1.13
+    """One clip's readout: diameters in mm, velocities in mm/s, and time in seconds."""
+    baseline_mm:      float
+    min_mm:           float
+    pct_constriction: float
+    latency_s:        float
+    cv_peak_mm_s:     float
+    cv_mean_mm_s:     float
+    dv_mm_s:          float
 
 
 def baseline_window_mask(t: np.ndarray, onset_t: float) -> np.ndarray:
@@ -135,10 +135,10 @@ def baseline_diameter(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float) -> fl
 
 
 def minimum_diameter(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float) -> float:
-    """Minimum pupil_mm over the post-onset region (t >= onset_t), NaN-safe."""
-    post_mask = t >= onset_t
-    pupil_after_onset = pupil_mm[post_mask]
-    return np.nanmin(pupil_after_onset)
+    """Robust minimum after the physiologic latency floor, rather than one raw outlier."""
+    post_mask = t >= onset_t + MIN_LATENCY_MS / 1000.0
+    pupil_after_onset = smooth_diameter(pupil_mm[post_mask])
+    return np.nanmin(pupil_after_onset) if np.isfinite(pupil_after_onset).any() else np.nan
 
 
 def percent_constriction(baseline_mm: float, min_mm: float) -> float:
@@ -205,8 +205,15 @@ def constriction_velocity(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float) -
     iend = int(np.argmax(reached))
     if iend + 1 < WIN:                        # phase shorter than the derivative window
         return (np.nan, np.nan)
-    t_phase     = t_phase[:iend + 1]
-    pupil_phase = pupil_phase[:iend + 1]
+    # Mean CV is an active-phase slope. Start when the smoothed diameter has moved 2% from
+    # its onset value instead of averaging the latency dead-time into the result.
+    started = (pupil_phase <= 0.98 * pupil_phase[0]) & searchable
+    if not started.any():
+        return (np.nan, np.nan)
+    istart = int(np.argmax(started))
+    t_phase = t_phase[istart:iend + 1]; pupil_phase = pupil_phase[istart:iend + 1]
+    if len(t_phase) < WIN:
+        return (np.nan, np.nan)
     dt = np.median(np.diff(t_phase))
     if not np.isfinite(dt) or dt <= 0:
         return (np.nan, np.nan)
@@ -218,18 +225,28 @@ def constriction_velocity(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float) -
 
 
 def dilation_velocity(t: np.ndarray, pupil_mm: np.ndarray, onset_t: float) -> float:
-    """Recovery velocity in mm/s after the minimum (re-dilation slope).
-    The only metric that lives in the dim post-flash regime, so it is the noisiest;
-    the snap-baseline does not help it (see CLAUDE.md dilation caveat)."""
+    """Robust active recovery slope after the smoothed nadir.
+
+    Returns NaN when the clip does not contain at least ``MIN_RECOVERY_SECONDS`` after its
+    nadir. This prevents a minimum at the final frame from becoming a fictional recovery rate.
+    """
     dilation_mask = t >= onset_t
-    t_phase     = t[dilation_mask]        # build the phase from the mask
-    pupil_phase = pupil_mm[dilation_mask]
-    imin = np.nanargmin(pupil_phase)          # then cut it at the minimum
-    t_phase     = t_phase[imin:]
-    pupil_phase = pupil_phase[imin:]
-    vel = np.diff(pupil_phase) / np.diff(t_phase)   # one copy only
-    mean = np.nanmean(vel)
-    return (mean)
+    t_phase = t[dilation_mask]; pupil_phase = smooth_diameter(pupil_mm[dilation_mask])
+    if np.isfinite(pupil_phase).sum() < 3:
+        return np.nan
+    imin = int(np.nanargmin(pupil_phase))
+    t_phase = t_phase[imin:]; pupil_phase = pupil_phase[imin:]
+    if len(t_phase) < 3 or t_phase[-1] - t_phase[0] < MIN_RECOVERY_SECONDS:
+        return np.nan
+    recovered = float(np.nanmax(pupil_phase) - pupil_phase[0])
+    if not np.isfinite(recovered) or recovered <= 0:
+        return np.nan
+    target = pupil_phase[0] + 0.8 * recovered
+    reached = np.flatnonzero(pupil_phase >= target)
+    iend = int(reached[0]) if reached.size else len(t_phase) - 1
+    if iend < 2 or t_phase[iend] <= t_phase[0]:
+        return np.nan
+    return float(np.polyfit(t_phase[:iend + 1], pupil_phase[:iend + 1], 1)[0])
 
 
 def compute_metrics(curve: dict, pupil_mm: np.ndarray | None = None) -> PLRMetrics:

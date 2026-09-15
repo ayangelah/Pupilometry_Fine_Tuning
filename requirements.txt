@@ -3,3 +3,4 @@ numpy<1.25
 torch>=2.6                  # weights_only=True default for safe checkpoint loading
 torchvision
 matplotlib
+scipy>=1.11,<1.12

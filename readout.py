@@ -10,15 +10,15 @@ needs an ROI (eye_rois.json) and an onset mark (light_onset.json). Output embeds
 so it is gitignored by default.
 """
 import os, sys, base64, html
-REPO = "/Users/angela/Desktop/AI_Portfolio/Pupilometry_App_Fine_Tuning"
+REPO = os.path.dirname(os.path.abspath(__file__))
 os.chdir(REPO); sys.path.insert(0, REPO)
 from pathlib import Path
 import numpy as np, cv2
 from plr_metrics import calibrate_mm, compute_metrics, assess_validity, IRIS_MM
+from video_timing import nearest_frame_index
 
 CLIP = sys.argv[1] if len(sys.argv) > 1 else "subject_b_2"
 OUT  = sys.argv[2] if len(sys.argv) > 2 else f"{REPO}/demo_readout.html"
-FPS  = 120.0
 
 # self-contained: build the curve straight from the clip (one sequential pass), no cache files
 from ritnet_segment import build_curve, _load_rois, get_roi, framed_roi, CLIPS_DIR
@@ -29,6 +29,7 @@ curve = build_curve(_cl, framed_roi(get_roi(CLIP, _f0, _load_rois()), _f0.shape)
 if curve["onset_t"] is None:
     sys.exit(f"{CLIP}: no onset mark in light_onset.json - add one before rendering a readout.")
 t, valid, onset_t = curve["t"], curve["valid"], float(curve["onset_t"])
+curve_frames = np.asarray(curve["frame_indices"], int)
 pupil_mm = calibrate_mm(curve)
 m = compute_metrics(curve, pupil_mm)
 V = assess_validity(curve)
@@ -68,7 +69,8 @@ try:
     rois = _load_rois()
     cap = cv2.VideoCapture(str(clip_path)); cap.set(cv2.CAP_PROP_POS_FRAMES, 0); _, f0 = cap.read()
     seed = get_roi(CLIP, f0, rois)
-    targets = {int(round(tt * FPS)): lbl for tt, lbl in frame_specs}
+    frame_for_time = lambda tt: int(curve_frames[nearest_frame_index(t, tt)])
+    targets = {frame_for_time(tt): lbl for tt, lbl in frame_specs}
     tracked, tracker, fi = {}, None, -1
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
     while True:
@@ -86,10 +88,10 @@ try:
         fr = crop(frame, tracked[fi]); cb = cv2.resize(fr, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
         return cb, measure(segment(ritnet_input(fr)), cb)
 
-    fi_low = int(round(t_min * FPS)); _, m_low = measure_frame(fi_low)
+    fi_low = frame_for_time(t_min); _, m_low = measure_frame(fi_low)
     locked_r = (m_low["pupil_px"] * IRIS_MM / float(pupil_mm[np.argmin(np.abs(t - t_min))])) / 2
     for tt, label in frame_specs:
-        cb, mm = measure_frame(int(round(tt * FPS)))
+        cb, mm = measure_frame(frame_for_time(tt))
         img = cb.copy(); p = mm["pupil_circle"]
         if p:
             pcx, pcy, pr = int(p[0]), int(p[1]), int(p[2])

@@ -15,6 +15,8 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
+from video_timing import DEFAULT_FPS, capture_fps, decoded_frame_time
+
 # RITnet lives in a cloned subrepo; put it on the path so we can import its model.
 RITNET_DIR = Path("RITnet")
 sys.path.insert(0, str(RITNET_DIR))
@@ -50,10 +52,11 @@ USE_RED_CHANNEL = True
 GLINT_PRESEG = False
 
 # capture / curve
-FPS             = 120.0      # clip frame rate (iPhone). Used for the time axis of the curve.
+FPS             = DEFAULT_FPS  # compatibility/default only; build_curve uses decoded timestamps.
 
 # Part 3: iris-lock + geometry/temporal quality gate thresholds
-CURVE_STRIDE    = 3          # build the curve from every Nth frame (120fps -> 40fps at 3); speed vs resolution
+CURVE_TARGET_HZ = 40.0       # desired inference cadence; stride adapts to each file's real average FPS
+CURVE_STRIDE    = 3          # compatibility value for older diagnostics; build_curve computes its own
 GATE_RATIO_MIN  = 0.15       # pupil/iris ratio below this is implausible -> reject that frame
 GATE_RATIO_MAX  = 0.75       # ...or above this
 GATE_CONCENTRIC = 0.25       # pupil center must sit within this fraction of the iris radius of the iris center
@@ -297,15 +300,28 @@ def lock_iris_radius(radii):
     radii = np.asarray(radii, float)
     return float(np.nanmedian(radii)) if np.isfinite(radii).any() else np.nan
 
-def light_onset_frame(clip_stem, fps=FPS):
-    """Frame index at/after which the flashlight is ON for this clip -> those frames are LIT.
-    Read from a manual mark now (LIGHT_ONSET_FILE, onset time in seconds). IN THE APP: replace
-    this lookup with the phone's own torch-on timestamp - a KNOWN signal, so onset is never
-    inferred or learned. Returns None if unmarked (build_curve then locks from ALL frames)."""
+def light_onset_time(clip_stem):
+    """Return optical onset in video-time seconds.
+
+    Existing ``light_onset.json`` values are plain seconds. An iOS sidecar may instead supply
+    a record with ``confirmed_video_time_s`` (preferred) or the provisional
+    ``first_frame_after_request_video_time_s``.
+    """
     if not LIGHT_ONSET_FILE.exists():
         return None
-    onset_s = json.loads(LIGHT_ONSET_FILE.read_text()).get(clip_stem)
-    return None if onset_s is None else int(round(float(onset_s) * fps))
+    onset = json.loads(LIGHT_ONSET_FILE.read_text()).get(clip_stem)
+    if onset is None:
+        return None
+    if isinstance(onset, dict):
+        confirmed = onset.get("confirmed_video_time_s")
+        onset = confirmed if confirmed is not None else onset.get("first_frame_after_request_video_time_s")
+    return None if onset is None else float(onset)
+
+
+def light_onset_frame(clip_stem, fps=FPS):
+    """Compatibility helper for diagnostics that still display a nominal frame number."""
+    onset_s = light_onset_time(clip_stem)
+    return None if onset_s is None else int(round(onset_s * fps))
 
 def passes_gate(iris_center, iris_r, pupil):
     """Geometry sanity for one frame's pupil read. Reject if the pupil is not plausibly sized,
@@ -344,18 +360,25 @@ def build_curve(clip_path, roi, seed_box=None):
     If TRACK_EYE and seed_box (the tight eye_rois box) is given, the eye is FOLLOWED
     per-frame so handheld drift never pushes it out of the crop (A5); otherwise the fixed
     `roi` is used for every frame. Reads frames in order (no per-frame seek, which was the
-    slow path on 4K clips) and measures every CURVE_STRIDE-th; tracking still runs every
-    frame so continuity is preserved. Returns dict(t, iris_px, pupil_px, ratio, valid, onset_t)."""
+    slow path on 4K clips) and adapts the measurement stride toward CURVE_TARGET_HZ; tracking
+    still runs every frame so continuity is preserved. Returns the decoded timestamps and source
+    frame indices alongside the diameter curve."""
     cap = cv2.VideoCapture(str(clip_path))
     n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     tracker, tracking = None, (TRACK_EYE and seed_box is not None)
-    iris_c, iris_r, pupil, kept = [], [], [], []
+    fps = capture_fps(cap)
+    curve_stride = max(1, int(round(fps / CURVE_TARGET_HZ)))
+    iris_c, iris_r, pupil, kept, kept_t = [], [], [], [], []
+    last_t, timestamp_fallbacks = None, 0
     fi = -1
     while True:
         ok, frame = cap.read()
         if not ok:
             break
         fi += 1
+        frame_t, from_container = decoded_frame_time(cap, fi, fps, last_t)
+        last_t = frame_t
+        timestamp_fallbacks += int(not from_container)
         if tracking:                                                    # follow the eye EVERY frame (continuity)
             g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if tracker is None:
@@ -365,7 +388,7 @@ def build_curve(clip_path, roi, seed_box=None):
             frame_roi = framed_roi(tight, frame.shape)
         else:
             frame_roi = roi
-        if fi % CURVE_STRIDE:                                           # measure only every Nth frame
+        if fi % curve_stride:                                           # target ~40 Hz even for 30-fps clips
             continue
         fr = crop(frame, frame_roi)
         crop_bgr = cv2.resize(fr, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
@@ -375,13 +398,17 @@ def build_curve(clip_path, roi, seed_box=None):
         iris_r.append(ic[2] if ic else np.nan)
         pupil.append(m["pupil_circle"])
         kept.append(fi)
+        kept_t.append(frame_t)
         if len(kept) % 25 == 0:
             print(f"  ...{fi}/{n} frames processed", end="\r")
     cap.release()
-    print(f"  {len(kept)} frames measured / {n} total" + (" (eye-tracked)" if tracking else ""))
+    timing_note = f", {timestamp_fallbacks} timestamp fallback(s)" if timestamp_fallbacks else ""
+    print(f"  {len(kept)} frames measured / {n} total @ {fps:.3f} avg fps{timing_note}" +
+          (" (eye-tracked)" if tracking else ""))
 
-    onset = light_onset_frame(Path(clip_path).stem)                     # KNOWN light-on (manual now, phone later)
-    lit = np.array(kept) >= onset if onset is not None else np.ones(len(kept), bool)
+    onset_t = light_onset_time(Path(clip_path).stem)                    # decoded-video time seconds
+    t = np.asarray(kept_t, float)
+    lit = t >= onset_t if onset_t is not None else np.ones(len(kept), bool)
     lit_radii = [r for r, L in zip(iris_r, lit) if L]                   # lock the ruler from LIT frames only
     locked_r = lock_iris_radius(lit_radii if any(lit) else iris_r)      # fall back to all if none flagged lit
     pupil_px = np.array([2.0 * p[2] if p else np.nan for p in pupil], float)
@@ -390,10 +417,10 @@ def build_curve(clip_path, roi, seed_box=None):
             pupil_px[j] = np.nan
     pupil_px = reject_temporal_outliers(pupil_px)                        # kill single-frame spikes
     iris_px = np.full(len(pupil_px), 2.0 * locked_r)
-    t = np.array(kept, float) / FPS
-    onset_t = onset / FPS if onset is not None else None                 # KNOWN light-on, in curve-t units (for Stage 2 windowing)
     return dict(t=t, iris_px=iris_px, pupil_px=pupil_px, ratio=pupil_px / iris_px,
-                valid=np.isfinite(pupil_px), onset_t=onset_t)
+                valid=np.isfinite(pupil_px), onset_t=onset_t,
+                frame_indices=np.asarray(kept, int), average_fps=fps,
+                curve_stride=curve_stride)
 
 # %% [test] fit_circle in isolation  <-- validates the circle math, no RITnet needed
 # Run BEFORE the full pipeline. Run cells: imports -> Part 1 -> this.
