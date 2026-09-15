@@ -3,14 +3,15 @@
 #
 # TARGET DESIGN: supervise ONLY inside the iris disk - pupil pixels -> pupil, the rest
 # of the iris -> iris, everything outside the iris -> IGNORE (no loss). This targets exactly the
-# pupil-vs-iris split, leaves sclera/background untouched, and on dark iris_only frames teaches
-# "disk is all iris, no pupil" (suppresses false pupils in the dark).
+# pupil-vs-iris split and leaves sclera/background untouched. ``iris_only`` means a human could
+# not resolve the pupil boundary: those frames supervise a visibility head, never a fabricated
+# "all iris / no pupil" segmentation target.
 
 # %% [imports + load ritnet_segment defs (config, preprocess, model, eval helpers)]
-import os, csv, math, copy
+import argparse, os, csv, math, copy
 os.environ.setdefault("MPLBACKEND", "Agg")
 import numpy as np, cv2, torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 
 _src = open("ritnet_segment.py").read().split("# %% [run validation]")[0]  # defs only, no run cells
 _ns = {"__name__": "__ft__"}; exec(compile(_src, "ritnet_segment.py", "exec"), _ns)
@@ -24,6 +25,8 @@ IGNORE = 255
 SUBJECTS   = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]     # LOSO folds: each is held out as the test subject once
 BATCH      = 4
 EPOCHS     = 5
+VISIBILITY_LOSS_WEIGHT = 0.5
+SEED       = 17
 CKPT_DIR   = "checkpoints"; os.makedirs(CKPT_DIR, exist_ok=True)
 # LR, weight decay, trainable layers, and class weights are set in train_fold() below. Pupil is a
 # MINORITY class inside the disk, so plain CE would under-weight it; it gets extra loss weight.
@@ -56,8 +59,8 @@ def _edge_clipped(frac=0.01):
 
 def load_records():
     """One record per usable labeled frame: dict(person, seq_id, frame, category, frame_path,
-    mask_path, edge_clip). Excludes reject frames. iris_only frames are KEPT (they supervise
-    'no pupil in the dark'). edge_clip marks frames whose eyebox is cut off by the frame
+    mask_path, edge_clip). Excludes reject frames. iris_only frames are KEPT to supervise
+    pupil-boundary visibility. edge_clip marks frames whose eyebox is cut off by the frame
     boundary: kept for training, dropped by eval_subject."""
     edge, recs = _edge_clipped(), []
     for r in csv.DictReader(open("labeling/gt.csv")):
@@ -87,6 +90,9 @@ def pick_val(held_out, subjects=None):
     return subjects[(i + 1) % len(subjects)]
 
 # %% [dataset]  <-- frame -> RITnet input tensor; GT -> ANCHORED 4-class target
+_BASE_PRED_CACHE = {}
+
+
 class IrisPupilDataset(Dataset):
     """Target construction (fixed): OUTSIDE the iris disk, keep the BASE model's own prediction
     (bg/sclera/outer-iris) as a pseudo-label; INSIDE the disk, use the hand-drawn GT (iris ring
@@ -99,9 +105,17 @@ class IrisPupilDataset(Dataset):
         base = load_ritnet(WEIGHTS, DEVICE).eval()                  # the ORIGINAL pretrained net
         self.base_pred = []
         with torch.no_grad():
-            for r in records:                                       # one forward per frame, cached
-                logits = base(preprocess(ritnet_input(cv2.imread(r["frame_path"]))).to(DEVICE))
-                self.base_pred.append(logits.argmax(1)[0].cpu().numpy().astype(np.uint8))  # (IN_H,IN_W)
+            for r in records:
+                if r["category"] != "full":
+                    # Segmentation loss is masked for human-unresolvable frames; no pseudo-label
+                    # forward is needed just to manufacture a target that will not be used.
+                    self.base_pred.append(np.zeros((IN_H, IN_W), np.uint8))
+                    continue
+                key = (r["frame_path"], use_red)
+                if key not in _BASE_PRED_CACHE:
+                    logits = base(preprocess(ritnet_input(cv2.imread(r["frame_path"]))).to(DEVICE))
+                    _BASE_PRED_CACHE[key] = logits.argmax(1)[0].cpu().numpy().astype(np.uint8)
+                self.base_pred.append(_BASE_PRED_CACHE[key])
 
     def __len__(self):
         return len(self.records)
@@ -119,12 +133,35 @@ class IrisPupilDataset(Dataset):
         _ns["USE_RED_CHANNEL"] = self.use_red                       # channel choice mirrors the pipeline
         x = preprocess(ritnet_input(cv2.imread(r["frame_path"]))).squeeze(0)   # (1,IN_H,IN_W)
         gt = cv2.imread(r["mask_path"], cv2.IMREAD_GRAYSCALE)
-        return x, self._target(gt, self.base_pred[i])
+        visible = float(r["category"] == "full")
+        segmentation_supervised = visible  # no invented pupil mask when a human cannot see it
+        return x, self._target(gt, self.base_pred[i]), visible, segmentation_supervised
 
 # %% [model load + freeze helper]  <-- boilerplate
+class RITnetWithVisibility(torch.nn.Module):
+    """RITnet segmentation plus a tiny image-level pupil-boundary visibility head.
+
+    The head pools the bottleneck feature map (32 channels), adding only 33 parameters. Its
+    output is confidence that a human-resolvable pupil boundary is present in this frame.
+    ``forward`` remains segmentation-only so the existing inference helpers still work.
+    """
+    def __init__(self, base):
+        super().__init__()
+        self.base = base
+        self.visibility_head = torch.nn.Linear(32, 1)
+
+    def forward_with_visibility(self, x):
+        logits = self.base(x)
+        pooled = torch.nn.functional.adaptive_avg_pool2d(self.base.x5, 1).flatten(1)
+        return logits, self.visibility_head(pooled).squeeze(1)
+
+    def forward(self, x):
+        return self.base(x)
+
+
 def load_model():
     """Fresh RITnet initialized from the pretrained weights, ready to fine-tune."""
-    return load_ritnet(WEIGHTS, DEVICE)
+    return RITnetWithVisibility(load_ritnet(WEIGHTS, DEVICE)).to(DEVICE)
 
 def set_trainable(model, train_substrings=None):
     """Freeze everything, then unfreeze params whose name contains any given substring. Pass
@@ -150,10 +187,23 @@ def freeze_bn(model):
 
 def save_ckpt(model, held_out, tag="best"):
     path = os.path.join(CKPT_DIR, f"ritnet_ft_holdout_{held_out}_{tag}.pkl")
-    torch.save(model.state_dict(), path); return path
+    torch.save(dict(segmentation_state=model.base.state_dict(),
+                    visibility_state=model.visibility_head.state_dict(),
+                    held_out=held_out, visibility_threshold=0.5), path)
+    return path
+
+
+def balanced_sampler(records, seed=SEED):
+    """Give each subject × visibility group equal expected weight per epoch."""
+    from collections import Counter
+    counts = Counter((r["person"], r["category"]) for r in records)
+    weights = torch.tensor([1.0 / counts[(r["person"], r["category"])] for r in records],
+                           dtype=torch.double)
+    generator = torch.Generator().manual_seed(seed)
+    return WeightedRandomSampler(weights, len(records), replacement=True, generator=generator)
 
 # %% [before/after eval]  <-- labeled accuracy on ONE subject, with a given model
-def eval_subject(model, held_out, recs, use_red=True):
+def eval_subject(model, held_out, recs, use_red=True, eval_visibility=False):
     """Run `model` over held-out subject's frames -> pupil/iris detection + IoU + diameter error.
     Uses the SAME recipe as eval_labeled: iris over all non-reject, pupil over 'full' frames only."""
     _ns["model"], _ns["USE_RED_CHANNEL"] = model, use_red          # segment() reads these module globals
@@ -164,13 +214,23 @@ def eval_subject(model, held_out, recs, use_red=True):
     def _iou(a, b):
         if a is None or b is None: return None
         u = np.logical_or(a, b).sum(); return float(np.logical_and(a, b).sum()) / u if u else 0.0
-    P = dict(iris_n=0, iris_det=0, iris_iou=[], pup_n=0, pup_det=0, pup_iou=[], pup_de=[])
+    P = dict(iris_n=0, iris_det=0, iris_iou=[], pup_n=0, pup_det=0,
+             pup_iou=[], pup_iou_all=[], pup_de=[], vis_n=0, vis_ok=0,
+             visible_n=0, visible_ok=0, hidden_n=0, hidden_ok=0)
     gt = {r["frame"]: r for r in csv.DictReader(open("labeling/gt.csv"))}
     for r in test:
         g = gt[r["frame"]]; im = cv2.imread(r["frame_path"]); h, w = im.shape[:2]
         bgr = cv2.resize(im, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
         with torch.no_grad():
             m = measure(segment(ritnet_input(bgr)), bgr)
+            if eval_visibility and hasattr(model, "forward_with_visibility"):
+                x = preprocess(ritnet_input(bgr)).to(DEVICE)
+                _, vis_logit = model.forward_with_visibility(x)
+                predicted_visible = bool(torch.sigmoid(vis_logit)[0].item() >= 0.5)
+                actual_visible = g["category"] == "full"
+                P["vis_n"] += 1; P["vis_ok"] += int(predicted_visible == actual_visible)
+                key = "visible" if actual_visible else "hidden"
+                P[f"{key}_n"] += 1; P[f"{key}_ok"] += int(predicted_visible == actual_visible)
         s = 0.5 * (IN_W / w + IN_H / h)
         if g["iris_cx"] != "":                                        # skip frames with no GT iris (e.g. pupil drawn, iris missed)
             P["iris_n"] += 1
@@ -184,22 +244,39 @@ def eval_subject(model, held_out, recs, use_red=True):
             if gated:
                 P["pup_det"] += 1
                 gp = np.zeros((h, w), np.uint8); cv2.circle(gp, (round(float(g["pupil_cx"])), round(float(g["pupil_cy"]))), round(float(g["pupil_r"])), 1, -1)
-                P["pup_iou"].append(_iou(cv2.resize(gp, (IN_W, IN_H), interpolation=cv2.INTER_NEAREST).astype(bool), disk_mask(m["pupil_circle"], (IN_H, IN_W))))
+                pupil_iou = _iou(cv2.resize(gp, (IN_W, IN_H), interpolation=cv2.INTER_NEAREST).astype(bool), disk_mask(m["pupil_circle"], (IN_H, IN_W)))
+                P["pup_iou"].append(pupil_iou); P["pup_iou_all"].append(pupil_iou)
                 P["pup_de"].append(abs(m["pupil_px"] - 2 * float(g["pupil_r"]) * s) / (2 * float(g["pupil_r"]) * s))
+            else:
+                P["pup_iou_all"].append(0.0)  # a miss is zero overlap, not omitted from the mean
     model.train(prev)
     f = lambda l: round(float(np.mean(l)), 3) if l else None
-    return dict(iris_det=P["iris_det"] / max(P["iris_n"], 1), iris_iou=f(P["iris_iou"]),
-                pup_det=P["pup_det"] / max(P["pup_n"], 1), pup_iou=f(P["pup_iou"]), pup_de=f(P["pup_de"]))
+    out = dict(iris_det=P["iris_det"] / max(P["iris_n"], 1), iris_iou=f(P["iris_iou"]),
+               pup_det=P["pup_det"] / max(P["pup_n"], 1), pup_iou_all=f(P["pup_iou_all"]),
+               pup_iou_detected=f(P["pup_iou"]), pup_de_detected=f(P["pup_de"]))
+    if eval_visibility:
+        out.update(visibility_acc=P["vis_ok"] / max(P["vis_n"], 1),
+                   visibility_tpr=P["visible_ok"] / max(P["visible_n"], 1),
+                   visibility_tnr=P["hidden_ok"] / max(P["hidden_n"], 1))
+    return out
 
 # %% [train one fold]
 def train_fold(held_out, recs, val_subj=None):
     exclude = {held_out} | ({val_subj} if val_subj else set())        # val subj is disjoint from train+test
-    train_recs = [r for r in recs if r["person"] not in exclude and r["category"] == "full"]  # pupil-visible only
-    loader = DataLoader(IrisPupilDataset(train_recs), batch_size=BATCH, shuffle=True)
+    train_recs = [r for r in recs if r["person"] not in exclude]
+    fold_seed = SEED + SUBJECTS.index(held_out)
+    np.random.seed(fold_seed); torch.manual_seed(fold_seed)
+    loader = DataLoader(IrisPupilDataset(train_recs), batch_size=BATCH,
+                        sampler=balanced_sampler(train_recs, fold_seed))
+    # IrisPupilDataset constructs a fully loaded/frozen base model, whose discarded random
+    # initialization advances PyTorch's RNG. Reset here so the visibility head is reproducible.
+    torch.manual_seed(fold_seed)
     model = load_model()
 
-    set_trainable(model, train_substrings=["out_conv", "up_block4"])          # choose what to fine-tune
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=IGNORE, weight=torch.tensor([1, 1, 1, 6], dtype=torch.float).to(DEVICE)) # bg, sclera, iris, pupil
+    set_trainable(model, train_substrings=["out_conv", "up_block4", "visibility_head"])
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=IGNORE, reduction="none",
+                                           weight=torch.tensor([1, 1, 1, 6], dtype=torch.float).to(DEVICE))
+    visibility_criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad],
         lr=1e-4, weight_decay=1e-4
@@ -209,13 +286,19 @@ def train_fold(held_out, recs, val_subj=None):
         model.train()
         freeze_bn(model)
         total_loss = 0
-        for x, y in loader: # each batch
+        for x, y, visible, segmentation_supervised in loader:
             x, y = x.to(DEVICE), y.to(DEVICE)
-            logits = model(x)                              # (B, 4, IN_H, IN_W)
-            loss = criterion(logits, y); loss.backward(); optimizer.step(); optimizer.zero_grad()
+            visible = visible.float().to(DEVICE)
+            segmentation_supervised = segmentation_supervised.float().to(DEVICE)
+            logits, visibility_logits = model.forward_with_visibility(x)
+            per_frame_seg = criterion(logits, y).mean(dim=(1, 2))
+            seg_loss = (per_frame_seg * segmentation_supervised).sum() / segmentation_supervised.sum().clamp_min(1)
+            visibility_loss = visibility_criterion(visibility_logits, visible)
+            loss = seg_loss + VISIBILITY_LOSS_WEIGHT * visibility_loss
+            loss.backward(); optimizer.step(); optimizer.zero_grad()
             total_loss += loss.item()
         # validate on the VAL subject (disjoint from held_out -> no leak into the reported score)
-        v = eval_subject(model, val_subj, recs) if val_subj else None
+        v = eval_subject(model, val_subj, recs, eval_visibility=True) if val_subj else None
         print(f"epoch {epoch}: avg loss {total_loss/len(loader):.4f}" + (f"  val[{val_subj}] {v}" if v else ""))
         if v is not None:
             score = v["pup_det"]                           # selection criterion (what to maximize)
@@ -231,29 +314,34 @@ def train_fold(held_out, recs, val_subj=None):
 # it picked ep0 (mean Δ +0.020 vs +0.023 fixed). Pass val_subj to re-enable once a POOLED multi-
 # subject val set makes the signal less noisy. Default (None) reproduces the best config.
 
-# %% [run one fold: before vs after]  <-- prints the delta the fine-tune bought
-HELD_OUT = "A"
-recs = load_records()
-base = load_model()
-print("BEFORE:", eval_subject(base, HELD_OUT, recs))
-ft = train_fold(HELD_OUT, recs)               # add val_subj=pick_val(HELD_OUT) for best-epoch
-print("AFTER :", eval_subject(ft, HELD_OUT, recs))
-save_ckpt(ft, HELD_OUT)
-
-# %% [run LOSO: hold out every subject once]  <-- the full sweep (a few min per fold)
-recs = load_records()
-loso = {}
-for held_out in SUBJECTS:
-    print(f"\n===== hold out {held_out} =====", flush=True)
-    before = eval_subject(load_model(), held_out, recs)          # base model on the unseen subject
-    ft = train_fold(held_out, recs)                              # fine-tune on the other 10 (val_subj=pick_val(held_out) to select best-epoch)
-    after = eval_subject(ft, held_out, recs)                     # fine-tuned model on the unseen subject
+def run_fold(held_out, recs):
+    base = load_model()
+    print("BEFORE:", eval_subject(base, held_out, recs))
+    ft = train_fold(held_out, recs)
+    after = eval_subject(ft, held_out, recs, eval_visibility=True)
+    print("AFTER :", after)
     save_ckpt(ft, held_out)
-    loso[held_out] = (before, after)
-    print(f"[{held_out}] BEFORE {before}  ->  AFTER {after}")
+    return after
 
-print("\n===== LOSO summary (before -> after per held-out subject) =====")
-for s, (b, a) in loso.items():
-    print(f"{s}:  before {b}\n     after  {a}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Visibility-aware RITnet fine-tuning")
+    parser.add_argument("--held-out", choices=SUBJECTS, default="A",
+                        help="run one subject-held-out fold (default: A)")
+    parser.add_argument("--loso", action="store_true", help="run every held-out subject")
+    args = parser.parse_args()
+    recs = load_records()
+    targets = SUBJECTS if args.loso else [args.held_out]
+    results = {}
+    for held_out in targets:
+        print(f"\n===== hold out {held_out} =====", flush=True)
+        results[held_out] = run_fold(held_out, recs)
+    if args.loso:
+        print("\n===== LOSO summary =====")
+        for subject, result in results.items(): print(f"{subject}: {result}")
+
+
+if __name__ == "__main__":
+    main()
 
 # %%
